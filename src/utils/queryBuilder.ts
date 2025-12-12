@@ -1,430 +1,550 @@
-// Query Builder in Prisma
-export type TSearchOption = 'exact' | 'partial' | 'enum' | 'search' | undefined;
-export type NestedFilter = {
-  key: string;
-  searchOption?: TSearchOption;
-  queryFields: string[];
-};
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 
-export interface rangeFilteringPrams {
-  field: string;
-  nestedField?: string;
-  maxQueryKey: string;
-  minQueryKey: string;
-  dataType: 'string' | 'number' | 'date';
-}
+/**
+ * QueryBuilder - Version 2.0
+ *
+ * DESCRIPTION::
+ * Full Type Safety
+ * Uses Prisma Generated types to Show correct auto complete and types
+ * Returns the final Included, Selected, Omitted value
+ * By Default doesn't require Type Input, but still shows suggestions.
+ *    But If Returned value's type is also required, then Type of the passed model and Payload of the model is required
+ *    Explanation can be found on the `constructor`
+ */
 
-interface ApplyCondition {
-  field: string;
-  nestedField?: string;
-  condition: Record<string, any>;
-}
-class QueryBuilder<T> {
-  private model: any;
-  private query: Record<string, unknown>;
-  private prismaQuery: Record<string, any> = {}; // Define as any for flexibility
-  private buildNestedCondition(
-    path: string[],
-    value: Record<string, any>,
-    index = 0,
-    condition: Record<string, any> = {},
-  ) {
-    const key = path[index];
-    condition[key] =
-      index === path.length - 1
-        ? value
-        : this.buildNestedCondition(path, value, index + 1, {});
-    return condition;
-  }
-  private pick(keys: string[]) {
-    const finalObj: Record<string, any> = {};
+import { GetResult, OperationPayload } from "@prisma/client/runtime/library";
 
-    for (const key of keys) {
-      if (this.query && Object.hasOwnProperty.call(this.query, key)) {
-        finalObj[key] = this.query[key];
-      }
+// Helper to check if a type is an enum
+type IsEnum<T> = T extends string | number
+    ? string extends T
+        ? false
+        : number extends T
+          ? false
+          : true
+    : false;
+
+type EnumKeys<T> = {
+    [K in keyof T]: IsEnum<T[K]> extends true ? K : never;
+}[keyof T];
+
+type DateKeys<T> = {
+    [K in keyof T]: T[K] extends Date ? K : never;
+}[keyof T];
+
+type CleanOptions<TInclude, TSelect, TOmit> = (TInclude extends undefined
+    ? {}
+    : { include: TInclude }) &
+    (TSelect extends undefined ? {} : { select: TSelect }) &
+    (TOmit extends undefined ? {} : { omit: TOmit });
+
+type JoinRecords<O, N> = (O extends undefined ? {} : O) & N;
+
+type ExtractField<TArgs, K extends keyof any> = [
+    Exclude<TArgs, undefined>,
+] extends [{ [P in K]?: infer S }]
+    ? S
+    : Record<string, any>;
+
+type WithString<T> = Array<Exclude<T, T[] | undefined> | (string & {})>;
+
+class QueryBuilder<
+    Model extends { findMany: (...args: any) => any },
+    TPayload,
+    TFindManyArgs = NonNullable<Parameters<Model["findMany"]>[0]>,
+    TInclude = undefined,
+    TSelect = undefined,
+    TOmit = undefined,
+> {
+    private model: any;
+    private query: Record<string, unknown>;
+    private prismaQuery: Partial<TFindManyArgs> | any = {};
+
+    /**
+     * @template Model (optional) - Type of the Model you are passing (e.g., `typeof prisma.user`) - Only pass if passing TPayload
+     * @template TPayload (optional) - The Prisma Payload type for the model (e.g., `Prisma.$UserPayload`) - Only pass if you need typing for returned fields
+     * @param model - The Prisma model client (e.g., prisma.user)
+     * @param query - The raw query object
+     *
+     *
+     * ``` ts
+     * // If Type of returned valued from `execute` isn't Needed
+     * const queryBuilder = new QueryBuilder(prisma.user, query)
+     *
+     * // If Type of returned valued from `execute` is Needed
+     * const queryBuilder = new QueryBuilder<typeof prisma.user, Prisma.$UserPayload>(prisma.user, query)
+     * //`typeof prisma.user` -> same for every model
+     * //`Prisma.$UserPayload` -> Just replace the $UserPayload with $ModelNamePayload -> where ModelName is capitalized
+     * ```
+     */
+    constructor(model: Model, query: Record<string, unknown>) {
+        this.model = model;
+        this.query = query;
     }
-    return finalObj;
-  }
-  // Helper method to build and apply conditions
-  private applyCondition({ nestedField, condition }: ApplyCondition) {
-    const pathSegments = nestedField?.split('.');
-
-    const existingOrCondition = this.prismaQuery?.where?.OR || [];
-    const finalCondition = pathSegments
-      ? this.buildNestedCondition(pathSegments, condition)
-      : condition;
-
-    this.prismaQuery.where = {
-      ...this.prismaQuery.where,
-      OR: [...existingOrCondition, finalCondition],
-    };
-  }
-  constructor(
-    query: Record<string, unknown>,
-    model: any,
-    staticFilter: Partial<T> = {},
-  ) {
-    this.model = model; // Prisma model instance
-    this.query = query; // Query params
-
-    this.prismaQuery.where = {
-      ...this.prismaQuery.where,
-      ...staticFilter,
-    };
-  }
-  // Search
-  search(searchableFields: string[]) {
-    const searchTerm = this.query.searchTerm as string;
-
-    if (searchTerm) {
-      this.prismaQuery.where = {
-        ...this.prismaQuery.where,
-        OR: searchableFields.map((field) => ({
-          [field]: { contains: searchTerm, mode: 'insensitive' },
-        })),
-      };
-    }
-    return this;
-  }
-
-  // Filter
-  filter(includeFeilds: string[] = []) {
-    const queryObj = this.pick(includeFeilds);
-
-    // if (Object.keys(queryObj).length === 0) return this;
-
-    const formattedFilters: Record<string, any> = {};
-    for (const [key, value] of Object.entries(queryObj)) {
-      if (typeof value === 'string' && value.includes('[')) {
-        const [field, operator] = key.split('[');
-        const op = operator.slice(0, -1); // Remove the closing ']'
-        formattedFilters[field] = { [op]: parseFloat(value as string) };
-      } else {
-        formattedFilters[key] = value;
-      }
-    }
-
-    this.prismaQuery.where = {
-      ...this.prismaQuery.where,
-      ...formattedFilters,
-    };
-
-    return this;
-  }
-
-  nestedFilter(nestedFilters: NestedFilter[]) {
-    nestedFilters.forEach(({ key, searchOption, queryFields }) => {
-      const pathSegments = key.split('.');
-
-      const queryObj = this.pick(queryFields);
-
-      if (Object.keys(queryObj).length === 0 && searchOption !== 'search')
-        return;
-
-      const orConditions = this.prismaQuery?.where?.OR || [];
-      const AndConditions = this.prismaQuery?.where?.AND || [];
-
-      if (searchOption == 'search') {
-        if (this.query.searchTerm) {
-          const nestedCondition = queryFields.map((field) => {
-            const condition = {
-              [field]: {
-                contains: this.query.searchTerm,
-                mode: 'insensitive',
-              },
-            };
-            return this.buildNestedCondition(pathSegments, condition);
-          });
-
-          this.prismaQuery.where = {
-            ...this.prismaQuery?.where,
-            OR: [...orConditions, ...nestedCondition],
-          };
-        }
-      } else if (searchOption === 'partial') {
-        const partialConditions = Object.entries(queryObj).map(
-          ([key, value]) => {
-            const condition = {
-              [key]: { equals: value, mode: 'insensitive' },
-            };
-            return this.buildNestedCondition(pathSegments, condition);
-          },
-        );
+    /**
+     * Adds OR search conditions for specified fields using query.searchTerm.
+     *
+     * Supports nested fields: `["name", "clinic.name"]`
+     */
+    search(
+        fields: TFindManyArgs extends { distinct?: infer T }
+            ? WithString<T>
+            : string[],
+    ) {
+        const searchTerm = this.query.searchTerm as string;
+        if (!searchTerm) return this;
 
         this.prismaQuery.where = {
-          ...this.prismaQuery.where,
-          OR: [...orConditions, ...partialConditions],
+            ...this.prismaQuery.where,
+            OR: (fields as string[]).map((field) => {
+                const parts = field.split("."); // split nested path
+                return parts.reduceRight<any>((acc, key, index) => {
+                    if (index === parts.length - 1) {
+                        // last part = the actual field
+                        return {
+                            [key]: {
+                                contains: searchTerm,
+                                mode: "insensitive",
+                            },
+                        };
+                    }
+                    return { [key]: acc }; // wrap previous level
+                }, {});
+            }),
         };
-      } else {
-        // Handle object query fields
 
-        const nestedConditions = Object.entries(queryObj).map(
-          ([field, value]) => {
-            let condition: Record<string, any> = {};
+        return this;
+    }
 
-            switch (searchOption) {
-              case 'enum':
-                condition = { [field]: { equals: value } };
-                break;
-              case 'exact':
-                condition = { [field]: { equals: value } };
-                break;
-              default:
-                condition = {
-                  [field]: { contains: value, mode: 'insensitive' },
+    /**
+     * Applies filter conditions for query fields.
+     * Supports "null", "notnull", exact fields, and contains search.
+     *
+     * Also supports nested exactFields: `["role", "client.status"]`
+     */
+    filter(
+        exactFields: (
+            | EnumKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
+            | (string & {})
+        )[],
+    ) {
+        const queryObj = { ...this.query };
+        const excludeFields = [
+            "searchTerm",
+            "sort",
+            "limit",
+            "page",
+            "fields",
+            "populate",
+            "dateRange",
+        ];
+        excludeFields.forEach((field) => delete queryObj[field]);
+
+        const formattedFilters: Record<string, any> = {};
+
+        for (const [field, value] of Object.entries(queryObj)) {
+            if (value === "null") {
+                formattedFilters[field] = null;
+            } else if (value === "notnull") {
+                formattedFilters[field] = { not: null };
+            } else if ((exactFields as string[]).includes(field)) {
+                const parts = field.split(".");
+                const nestedFilter = parts.reduceRight<any>(
+                    (acc, key, index) => {
+                        if (index === parts.length - 1) {
+                            return { [key]: { equals: value } };
+                        }
+                        return { [key]: acc };
+                    },
+                    {},
+                );
+                Object.assign(formattedFilters, nestedFilter);
+            } else {
+                formattedFilters[field] = {
+                    contains: value,
+                    mode: "insensitive",
                 };
             }
+        }
 
-            return this.buildNestedCondition(pathSegments, condition);
-          },
-        );
         this.prismaQuery.where = {
-          ...this.prismaQuery?.where,
-          AND: [...AndConditions, ...nestedConditions],
-        };
-      }
-    });
-
-    return this;
-  }
-
-  //raw filter
-  rawFilter(filters: Record<string, any>) {
-    // Ensure that the filters are merged correctly with the existing where conditions
-    this.prismaQuery.where = {
-      ...this.prismaQuery.where,
-      ...filters,
-    };
-    console.log(this.prismaQuery.where);
-    return this;
-  }
-
-  // Range (Between) Filter
-  filterByRange(betweenFilters: rangeFilteringPrams[]) {
-    betweenFilters.forEach(
-      ({ field, maxQueryKey, minQueryKey, nestedField, dataType }) => {
-        const queryObj = this.pick([maxQueryKey, minQueryKey]);
-        let maxValue = queryObj[maxQueryKey];
-        let minValue = queryObj[minQueryKey];
-
-        if (!maxValue && !minValue) return;
-
-        // Helper function to cast values based on data type
-        const castValue = (value: any) => {
-          if (dataType === 'date') {
-            const dateParts = value.split('-');
-            const utcDate = new Date(
-              Date.UTC(dateParts[0], Number(dateParts[1]) - 1, dateParts[2]),
-            );
-            return utcDate;
-          }
-          if (dataType === 'number') return Number(value);
-          return value;
+            ...this.prismaQuery.where,
+            ...formattedFilters,
         };
 
-        if (maxValue) maxValue = castValue(maxValue);
-        if (minValue) minValue = castValue(minValue);
-
-        const condition: Record<string, any> = {
-          [field]: {
-            ...(minValue !== undefined ? { gte: minValue } : {}),
-            ...(maxValue !== undefined ? { lte: maxValue } : {}),
-          },
-        };
-
-        this.applyCondition({ field, nestedField, condition });
-      },
-    );
-
-    return this;
-  }
-
-  populate(relations: Record<string, boolean | object>) {
-    this.prismaQuery.include = {
-      ...this.prismaQuery.include,
-      ...Object.fromEntries(
-        Object.entries(relations).map(([key, value]) => {
-          if (typeof value === 'boolean') {
-            return [key, value];
-          }
-          return [key, { include: value }];
-        }),
-      ),
-    };
-    return this;
-  }
-
-  // Sorting
-  sort() {
-    const sort = (this.query.sort as string)?.split(',') || ['-createdAt'];
-    const orderBy = sort.map((field) => {
-      if (field.startsWith('-')) {
-        return { [field.slice(1)]: 'desc' };
-      }
-      return { [field]: 'asc' };
-    });
-
-    this.prismaQuery.orderBy = orderBy;
-    return this;
-  }
-
-  // Pagination
-  paginate() {
-    const page = Number(this.query.page) || 1;
-    const limit = Number(this.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    this.prismaQuery.skip = skip;
-    this.prismaQuery.take = limit;
-
-    return this;
-  }
-
-  // Fields Selection
-  fields() {
-    const fields = (this.query.fields as string)?.split(',') || [];
-    if (fields.length > 0) {
-      this.prismaQuery.select = fields.reduce(
-        (acc: Record<string, boolean>, field) => {
-          acc[field] = true;
-          return acc;
-        },
-        {},
-      );
+        return this;
     }
-    return this;
-  }
 
-  // *Include Related Models/
-  include(includableFields: Record<string, boolean | object>) {
-    this.prismaQuery.include = {
-      ...this.prismaQuery?.include,
-      ...includableFields,
-    };
-    return this;
-  }
+    /**
+     * Merges raw arguments into prismaQuery.
+     * Special handling for 'where' to merge AND/OR conditions safely.
+     */
+    rawArgs(args: Partial<TFindManyArgs>) {
+        Object.entries(args).forEach(([key, value]) => {
+            if (key === "where" && value) {
+                const whereValue = value as any;
+                this.prismaQuery.where = {
+                    ...(this.prismaQuery.where ?? {}),
+                    ...whereValue,
+                    AND: [
+                        ...(this.prismaQuery.where?.AND ?? []),
+                        ...(whereValue.AND
+                            ? Array.isArray(whereValue.AND)
+                                ? whereValue.AND
+                                : [whereValue.AND]
+                            : []),
+                    ],
+                    OR: [
+                        ...(this.prismaQuery.where?.OR ?? []),
+                        ...(whereValue.OR
+                            ? Array.isArray(whereValue.OR)
+                                ? whereValue.OR
+                                : [whereValue.OR]
+                            : []),
+                    ],
+                };
+            } else if (
+                value &&
+                typeof value === "object" &&
+                !Array.isArray(value)
+            ) {
+                this.prismaQuery[key] = {
+                    ...(this.prismaQuery[key] ?? {}),
+                    ...value,
+                };
+            } else {
+                this.prismaQuery[key] = value;
+            }
+        });
 
-  getAllQueries() {
-    return this.prismaQuery;
-  }
+        return this;
+    }
 
-  // *Execute Query/
-  async execute() {
-    console.log(this.prismaQuery);
-    return this.model.findMany(this.prismaQuery);
-  }
+    /**
+     * Adds raw filters to 'where'.
+     * Safely merges AND/OR with existing where conditions.
+     */
+    rawFilter(
+        filters: TFindManyArgs extends { where?: infer W }
+            ? NonNullable<W>
+            : Record<string, any>,
+    ) {
+        const where = this.prismaQuery.where ?? {};
+        const newWhere = {
+            ...where,
+            ...filters!,
+            AND: [
+                ...(where.AND ?? []),
+                ...((filters as any).AND
+                    ? Array.isArray((filters as any).AND)
+                        ? (filters as any).AND
+                        : [(filters as any).AND]
+                    : []),
+            ],
+            OR: [
+                ...(where.OR ?? []),
+                ...((filters as any).OR
+                    ? Array.isArray((filters as any).OR)
+                        ? (filters as any).OR
+                        : [(filters as any).OR]
+                    : []),
+            ],
+        };
+        this.prismaQuery.where = newWhere;
+        return this;
+    }
 
-  // Count Total
-  async countTotal() {
-    const total = await this.model.count({ where: this.prismaQuery.where });
-    const page = Number(this.query.page) || 1;
-    const limit = Number(this.query.limit) || 10;
-    const totalPage = Math.ceil(total / limit);
+    /**
+     * Applies date range filters from query.dateRange.
+     * Supports multiple fields with gte/lte.
+     * Ex: createdAt[2025-02-19T10:13:59.425Z,2025-02-20T10:13:59.425Z];updatedAt[2025-02-19T12:00:00.000Z,2025-02-19T15:00:00.000Z]
+     */
+    range() {
+        const dateRanges = this.query.dateRange
+            ? (this.query.dateRange as string).split(";")
+            : [];
+        if (dateRanges.length > 0) {
+            const rangeFilters: Record<string, any>[] = [];
 
-    return {
-      page,
-      limit,
-      total,
-      totalPage,
-    };
-  }
+            dateRanges.forEach((range) => {
+                const [fieldName, dateRange] = range.split("[");
+                if (fieldName && dateRange) {
+                    const cleanedDateRange = dateRange.replace("]", "");
+                    const [startRange, endRange] = cleanedDateRange.split(",");
+
+                    const rangeFilter: Record<string, any> = {};
+                    if (startRange && endRange) {
+                        rangeFilter[fieldName] = {
+                            gte: new Date(startRange),
+                            lte: new Date(endRange),
+                        };
+                    } else if (startRange) {
+                        rangeFilter[fieldName] = { gte: new Date(startRange) };
+                    } else if (endRange) {
+                        rangeFilter[fieldName] = { lte: new Date(endRange) };
+                    }
+
+                    if (Object.keys(rangeFilter).length > 0) {
+                        rangeFilters.push(rangeFilter);
+                    }
+                }
+            });
+
+            if (rangeFilters.length > 0) {
+                this.prismaQuery.where = {
+                    ...this.prismaQuery.where,
+                    OR: rangeFilters,
+                };
+            }
+        }
+
+        return this;
+    }
+
+    /**
+     * Uses the convenient startDate - endDate method to use range. requires to pass fields
+     * Takes date object from query's startDate and endDate
+     * If only either is passed, query is being created based on that
+     */
+    rangeDate(
+        fields: (
+            | DateKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
+            | (string & {})
+        )[],
+    ) {
+        const { startDate, endDate } = this.query as {
+            startDate?: string;
+            endDate?: string;
+        };
+
+        const rangeQuery: Partial<{ gte: Date; lte: Date }> = {};
+        if (startDate) rangeQuery.gte = new Date(startDate);
+        if (endDate) rangeQuery.lte = new Date(endDate);
+
+        if (!startDate && !endDate) return this;
+
+        const stringFields = fields as readonly string[];
+
+        this.prismaQuery.where = {
+            ...this.prismaQuery.where,
+            OR: stringFields.map((field) => {
+                const parts = field.split(".");
+                return parts.reduceRight(
+                    (acc, key, index) => {
+                        return index === parts.length - 1
+                            ? { [key]: rangeQuery }
+                            : { [key]: acc };
+                    },
+                    {} as Record<string, any>,
+                );
+            }),
+        };
+
+        return this;
+    }
+
+    /**
+     * Applies sorting from query.sort string.
+     * Supports "-" prefix for descending order.
+     */
+    sort() {
+        const sort = (this.query.sort as string)?.split(",") || ["-createdAt"];
+        const orderBy = sort.map((field) => {
+            if (field.startsWith("-")) {
+                return { [field.slice(1)]: "desc" };
+            }
+            return { [field]: "asc" };
+        });
+
+        this.prismaQuery.orderBy = orderBy;
+        return this;
+    }
+
+    /**
+     * Applies custom sort fields.
+     * Accepts single object or array of Prisma orderBy objects.
+     */
+    sortBy(
+        fields: TFindManyArgs extends { orderBy?: infer T }
+            ? T
+            : Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[],
+    ) {
+        const existing = Array.isArray(this.prismaQuery.orderBy)
+            ? this.prismaQuery.orderBy
+            : this.prismaQuery.orderBy
+              ? [this.prismaQuery.orderBy]
+              : [];
+        const newFields = Array.isArray(fields) ? fields : [fields];
+        this.prismaQuery.orderBy = [...existing, ...newFields];
+        return this;
+    }
+
+    /**
+     * Applies pagination based on query.page and query.limit.
+     */
+    paginate() {
+        const page = Number(this.query.page) || 1;
+        const limit = Number(this.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        this.prismaQuery.skip = skip;
+        this.prismaQuery.take = limit;
+
+        return this;
+    }
+
+    /**
+     * Selects fields from query.fields string.
+     */
+    fields() {
+        const fields = (this.query.fields as string)?.split(",") || [];
+        if (fields.length > 0) {
+            this.prismaQuery.select = fields.reduce(
+                (acc: Record<string, boolean>, field) => {
+                    acc[field] = true;
+                    return acc;
+                },
+                {},
+            );
+        }
+        return this;
+    }
+
+    /**
+     * Adds Prisma include fields to query.
+     */
+    include<T extends ExtractField<TFindManyArgs, "include">>(
+        fields: T,
+    ): [TSelect] extends [undefined]
+        ? QueryBuilder<
+              Model,
+              TPayload,
+              TFindManyArgs,
+              JoinRecords<TInclude, T>,
+              TSelect,
+              TOmit
+          >
+        : "Please either choose `select` or `include`" {
+        this.prismaQuery.include = {
+            ...this.prismaQuery.include,
+            ...(fields as Record<string, unknown>),
+        };
+        return this as any;
+    }
+
+    /**
+     * Adds Prisma select fields to query.
+     */
+    select<T extends ExtractField<TFindManyArgs, "select">>(
+        fields: T,
+    ): [TInclude] extends [undefined]
+        ? [TOmit] extends [undefined]
+            ? QueryBuilder<
+                  Model,
+                  TPayload,
+                  TFindManyArgs,
+                  TInclude,
+                  JoinRecords<TSelect, T>,
+                  TOmit
+              >
+            : "Please either choose `select` or `omit`"
+        : "Please either choose `select` or `include`" {
+        this.prismaQuery.select = {
+            ...this.prismaQuery.select,
+            ...(fields as Record<string, unknown>),
+        };
+        return this as any;
+    }
+
+    /**
+     * Adds Prisma omit fields to query.
+     */
+    omit<T extends ExtractField<TFindManyArgs, "omit">>(
+        fields: T,
+    ): [TSelect] extends [undefined]
+        ? QueryBuilder<
+              Model,
+              TPayload,
+              TFindManyArgs,
+              TInclude,
+              TSelect,
+              JoinRecords<TOmit, T>
+          >
+        : "Please either choose `select` or `omit`" {
+        this.prismaQuery.omit = {
+            ...this.prismaQuery.omit,
+            ...(fields as Record<string, unknown>),
+        };
+        return this as any;
+    }
+
+    /**
+     * Executes the Prisma findMany query with any extra options.
+     */
+    async execute(
+        extraOptions: TFindManyArgs extends { [key: string]: any }
+            ? TFindManyArgs
+            : Record<string, any> = {} as any,
+    ): Promise<
+        TPayload extends OperationPayload
+            ? GetResult<
+                  TPayload,
+                  CleanOptions<TInclude, TSelect, TOmit>,
+                  "findMany"
+              >
+            : any[]
+    > {
+        const query = this.cleanQuery(this.prismaQuery);
+
+        return this.model.findMany({
+            ...query,
+            ...extraOptions,
+        });
+    }
+
+    /**
+     * Returns total count, current page, limit, and total pages.
+     */
+    async countTotal(): Promise<{
+        page: number;
+        limit: number;
+        total: any;
+        totalPage: number;
+    }> {
+        const query = this.cleanQuery(this.prismaQuery);
+
+        const total = await this.model.count({ where: query.where });
+        const page = Number(this.query.page) || 1;
+        const limit = Number(this.query.limit) || 10;
+        const totalPage = Math.ceil(total / limit);
+
+        return {
+            page,
+            limit,
+            total,
+            totalPage,
+        };
+    }
+
+    // Utility Functions
+    private cleanQuery(query: Record<string, any>) {
+        if (!query.where) return query;
+
+        const cleanedWhere = { ...query.where };
+
+        if (Array.isArray(cleanedWhere.AND) && cleanedWhere.AND.length === 0) {
+            delete cleanedWhere.AND;
+        }
+
+        if (Array.isArray(cleanedWhere.OR) && cleanedWhere.OR.length === 0) {
+            delete cleanedWhere.OR;
+        }
+
+        return {
+            ...query,
+            where: cleanedWhere,
+        };
+    }
 }
 
 export default QueryBuilder;
-
-function parseSelect(input: {
-  own?: string[];
-  nested?: any[];
-}): Record<string, any> {
-  const select: Record<string, any> = {};
-
-  // Handle root fields (fields directly on the model)
-  for (const field of input.own || []) {
-    select[field] = true;
-  }
-
-  // Handle nested models
-  for (const nestedItem of input.nested || []) {
-    const [modelKey, fields, nestedChildren] = nestedItem;
-
-    // Initialize the model key in select object with an empty 'select' object
-    if (!select[modelKey]) {
-      select[modelKey] = { select: {} };
-    }
-
-    // Add fields to the nested model's 'select' object
-    if (Array.isArray(fields) && fields.length > 0) {
-      fields.forEach((field) => {
-        select[modelKey].select[field] = true;
-      });
-    }
-
-    // If there are nested children, recurse into them and assign to the 'select' key
-    if (Array.isArray(nestedChildren) && nestedChildren.length > 0) {
-      select[modelKey].select = {
-        ...select[modelKey].select, // Keep existing fields
-        ...parseSelect({
-          own: [], // No root fields for nested models
-          nested: nestedChildren,
-        }),
-      };
-    }
-  }
-
-  return select;
-}
-
-const fields: Fields = {
-  own: ['status', 'email'],
-  nested: [
-    [
-      'user',
-      ['status', 'subscriptionStatus'],
-      [['profile', ['name', 'img'], [['member', ['id', 'status']]]]],
-    ],
-    ['admin', ['name', 'img'], [['notification', ['id', 'status']]]],
-  ],
-};
-type SelectField = string | { [key: string]: boolean | SelectField };
-
-type nestedArrayType = Array<[string, string[], nestedArrayType?]>;
-interface Fields {
-  own?: string[]; // Fields directly on the model
-  nested?: nestedArrayType;
-}
-
-const converted = {
-  status: true,
-  email: true,
-  user: {
-    select: {
-      status: true,
-      subscriptionStatus: true,
-      profile: {
-        select: {
-          name: true,
-          img: true,
-          member: {
-            select: {
-              id: true,
-              status: true,
-            },
-          },
-        },
-      },
-    },
-  },
-  admin: {
-    select: {
-      name: true,
-      img: true,
-      notification: {
-        select: {
-          id: true,
-          status: true,
-        },
-      },
-    },
-  },
-};

@@ -1,268 +1,365 @@
-import { BrevoService } from '@/email/brevo';
-import { sendEmail } from '@/email/resend';
-import { PrismaService } from '@/helper/prisma.service';
-import { BrevoEmailParams } from '@/interface/brevo';
-import { UserService } from '@/modules/user/user.service';
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
-import e from 'express';
-import { ApiError } from 'src/utils/api_error';
-import { BcryptService } from 'src/utils/bcrypt.service';
+import { PrismaService } from "@/helper/prisma.service";
+import { HttpStatus, Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { ApiError } from "src/utils/api_error";
+import { BcryptService } from "src/utils/bcrypt.service";
+import { RegisterUserDto } from "./dto/register.dto";
+import { generateOTP } from "./auth.utils";
+import config from "@/config";
+import {
+    generateForgetPasswordTemplate,
+    generateVerifyOTPTemplate,
+} from "./auth.template";
+import emailSender from "@/email/nodemailer";
+import { ChangePasswordDto } from "./dto/changePassword.dto";
+import { JwtPayload } from "@/interface/jwtPayload";
+import { ResetPasswordDto } from "./dto/resetPassword.dto";
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private usersService: UserService,
-    private jwtService: JwtService,
-    private bcryptService: BcryptService,
-    private configService: ConfigService,
-    private brevoService: BrevoService,
-    private prisma: PrismaService,
-  ) { }
+    constructor(
+        private jwtService: JwtService,
+        private bcryptService: BcryptService,
+        private prisma: PrismaService,
+    ) {}
 
-  // All User Resiger Here 
+    async register(payload: RegisterUserDto) {
+        const isUserExists = await this.prisma.user.findUnique({
+            where: { email: payload.email },
+        });
 
-  async RegisterUser(data: any) {
-       const repsonse = await this.prisma.$transaction(async (tx) => {
-              const {trader, ...user} = data;
-             
-            const isUserExists = await this.usersService.getOne({ email: user.email });
+        if (isUserExists) {
+            throw new ApiError(
+                HttpStatus.CONFLICT,
+                "User with this Email already exists!",
+            );
+        }
 
-            if (isUserExists) {
-              throw new ApiError(HttpStatus.CONFLICT, 'User already exists');
-            }
+        const { otp, otpExpiry } = generateOTP();
 
-            user.password = await this.bcryptService.hash(user.password);
-          
-            const userData = await this.usersService.createUser(user);
+        const hashedPassword: string = await this.bcryptService.hash(
+            payload.password,
+        );
+        const response = await this.prisma.user.create({
+            data: { ...payload, otp, otpExpiry, password: hashedPassword },
+            omit: { password: true },
+        });
 
-           await this.prisma.trader.create({
-              data: {
-                userId: userData.id,
-                ...trader
-              }
+        const html = generateVerifyOTPTemplate(otp);
+        await emailSender({
+            email: response.email,
+            subject: `Account Verification Code - ${config.company_name}`,
+            html,
+        });
+
+        return {
+            message: "Verification code sent",
+        };
+    }
+
+    async loginWithEmail(payload: { email: string; password: string }) {
+        const userData = await this.prisma.user.findUniqueOrThrow({
+            where: {
+                email: payload.email,
+            },
+        });
+        if (!userData) {
+            throw new ApiError(400, "Invalid Credentials");
+        }
+
+        if (!payload.password || !userData?.password) {
+            throw new Error("Password is required");
+        }
+
+        const isCorrectPassword = await this.bcryptService.compare(
+            payload.password,
+            userData.password,
+        );
+
+        if (!isCorrectPassword) {
+            throw new ApiError(400, "Invalid Credentials");
+        }
+
+        if (userData.status === "INACTIVE")
+            throw new ApiError(
+                HttpStatus.FORBIDDEN,
+                "This account is Inactive",
+            );
+        if (userData.deleted) throw new ApiError(400, "Invalid Credentials");
+
+        if (!userData?.verified) {
+            const { otp, otpExpiry } = generateOTP();
+
+            await this.prisma.user.update({
+                where: {
+                    id: userData.id,
+                },
+                data: { otp, otpExpiry },
             });
 
-            return await this.prisma.user.findUnique({
-              where: { id: userData.id },
-              include: { trader: true }
+            const html = generateVerifyOTPTemplate(otp);
+            await emailSender({
+                email: userData.email,
+                subject: `Account Verification Code - ${config.company_name}`,
+                html,
             });
-       })
 
-       return repsonse
-  }
+            throw new ApiError(
+                HttpStatus.FORBIDDEN,
+                "Check Email and Verify your account first!",
+            );
+        }
 
+        const jwtPayload = {
+            id: userData.id,
+            email: userData.email,
+            role: userData.role,
+        } satisfies JwtPayload;
 
-  async login(data: {
-    email: string;
-    password?: string;
-    avatar?: string;
-    fullName?: string;
-  }): Promise<{ access_token: string; refresh_token: string }> {
-    const { email, password } = data;
+        const accessToken = this.jwtService.signAsync(jwtPayload, {
+            secret: config.jwt.jwt_secret,
+            expiresIn: config.jwt.jwt_secret_expires_in,
+        });
+        const refreshToken = this.jwtService.signAsync(jwtPayload, {
+            secret: config.jwt.refresh_token_secret,
+            expiresIn: config.jwt.refresh_token_expires_in,
+        });
 
-    console.log(email,password, 'email and password in auth service');
-
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { admin: true }
-    });
-
-    console.log(user, 'user found in auth service');
-
-    if (!user) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'User not found');
+        return {
+            message: "Login successful",
+            data: {
+                refreshToken,
+                accessToken,
+            },
+        };
     }
 
-    const isPasswordMatched = await this.bcryptService.compare(
-      password,
-      user.password!,
-    );
+    async resendOTP(payload: { email: string }) {
+        const userData = await this.prisma.user.findFirst({
+            where: {
+                email: payload.email,
+            },
+        });
 
-    if (!isPasswordMatched) {
-      throw new ApiError(HttpStatus.UNAUTHORIZED, 'Password is incorrect');
+        if (!userData) {
+            throw new ApiError(404, "User not found");
+        }
+        if (userData.verified) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Account already verified",
+            );
+        }
+
+        const { otp, otpExpiry } = generateOTP();
+
+        await this.prisma.user.update({
+            where: {
+                id: userData.id,
+            },
+            data: { otp, otpExpiry },
+        });
+
+        const html = generateVerifyOTPTemplate(otp);
+        await emailSender({
+            email: userData.email,
+            subject: `Account Verification Code - ${config.company_name}`,
+            html,
+        });
+
+        return "OTP Resent Successfully!";
     }
 
-    const payload = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.username,
-      avatar: user.avatar,
-    };
+    async verifyOTP(payload: { otp: string; email: string }) {
+        const userData = await this.prisma.user.findFirst({
+            where: {
+                email: payload.email,
+            },
+        });
 
-    const accessToken = this.jwtService.signAsync(payload);
+        if (!userData) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "User not found");
+        }
 
-    const refreshToken = this.jwtService.signAsync(payload);
+        if (userData.otp !== payload.otp) {
+            throw new ApiError(HttpStatus.FORBIDDEN, "Incorrect OTP");
+        }
 
-    return {
-      access_token: await accessToken,
-      refresh_token: await refreshToken,
-    };
-  }
+        if (userData.otpExpiry && userData.otpExpiry < new Date()) {
+            throw new ApiError(HttpStatus.BAD_REQUEST, "OTP expired");
+        }
 
-  async getMe(user: User) {
-  const include = user?.role === 'ADMIN'
-    ? { admin: true }
-    : { trader: true };
+        await this.prisma.user.update({
+            where: {
+                id: userData.id,
+            },
+            data: {
+                otp: null,
+                otpExpiry: null,
+                verified: true,
+            },
+        });
 
-  const isUserExists = await this.prisma.user.findUnique({
-    where: {
-      email: user?.email,
-    },
-    include: include
-  });
-
-  console.log(isUserExists, 'isUserExists in getMe method');
-
-  if (!isUserExists) {
-    throw new ApiError(HttpStatus.NOT_FOUND, `User not found`);
-  }
-
-  return isUserExists;
-}
-
-
-  async changePassword({
-    id,
-    prevPass,
-    newPass,
-  }: {
-    id: string;
-    prevPass: string;
-    newPass: string;
-  }) {
-    console.log(id);
-    const isUserExists = await this.prisma.user.findUnique({ where: { id } });
-
-    if (!isUserExists) {
-      throw new ApiError(HttpStatus.NOT_FOUND, `user not found`);
+        return {
+            message: "OTP Verification successful",
+        };
     }
 
-    const isPasswordMatched = await this.bcryptService.compare(
-      prevPass,
-      isUserExists.password!,
-    );
+    async changePassword(payload: ChangePasswordDto, user: JwtPayload) {
+        if (!payload.oldPassword || !payload.newPassword) {
+            throw new ApiError(HttpStatus.BAD_REQUEST, "Invalid Body Provided");
+        }
 
-    if (!isPasswordMatched) {
-      throw new ApiError(HttpStatus.UNAUTHORIZED, 'Password is not matched!');
+        const userData = await this.prisma.user.findUnique({
+            where: { id: user?.id },
+        });
+
+        if (!userData) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "User not found!");
+        }
+
+        if (!userData?.password) {
+            throw new ApiError(
+                HttpStatus.UNAUTHORIZED,
+                "Unauthenticated Request!",
+            );
+        }
+
+        const passwordValid = await this.bcryptService.compare(
+            payload.oldPassword,
+            userData?.password,
+        );
+
+        if (!passwordValid) {
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Incorrect Password");
+        }
+
+        const hashedPassword = await this.bcryptService.hash(
+            payload.newPassword,
+        );
+
+        await this.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                password: hashedPassword,
+            },
+        });
+        return { message: "Password Changed successfully" };
     }
 
-    const hashPassword = await this.bcryptService.hash(newPass);
+    async forgotPassword(payload: { email: string }) {
+        const userData = await this.prisma.user.findUnique({
+            where: {
+                email: payload.email,
+            },
+        });
+        if (!userData) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "User not found");
+        }
 
-    const changePassword = await this.prisma.user.update({
-      where: { id: isUserExists?.id },
-      data: {
-        password: hashPassword,
-      },
-    });
+        const jwtPayload = { email: userData.email, role: userData.role };
+        const resetPassToken = this.jwtService.signAsync(jwtPayload, {
+            secret: config.jwt.reset_token_secret,
+            expiresIn: config.jwt.reset_token_expires_in,
+        });
 
-    if (!changePassword) {
-      throw new ApiError(HttpStatus.NOT_FOUND, `password not updated`);
+        const resetPassLink =
+            config.url.reset_pass +
+            `?userId=${userData.id}&token=${resetPassToken}`;
+
+        const html = generateForgetPasswordTemplate(resetPassLink);
+        await emailSender({
+            email: userData.email,
+            subject: `Password Reset Request - ${config.company_name}`,
+            html,
+        });
+
+        return {
+            message: "Password Reset Instructions sent to Email",
+        };
     }
 
-    return 'password updated';
-  }
+    async refreshToken(payload: { refreshToken: string }) {
+        if (!payload.refreshToken) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "refreshToken is required",
+            );
+        }
 
-  async forgetPassword({ email }: { email: string }) {
-    const user = await this.usersService.getOne({ email });
+        let decrypted;
+        try {
+            decrypted = this.jwtService.verifyAsync(payload.refreshToken, {
+                secret: config.jwt.refresh_token_secret,
+            });
+        } catch {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Refresh Token is Invalid or Expired",
+            );
+        }
 
+        const userData = await this.prisma.user.findUnique({
+            where: { id: decrypted.id },
+        });
 
+        if (!userData) {
+            throw new ApiError(
+                HttpStatus.UNAUTHORIZED,
+                "Unauthenticated Request",
+            );
+        }
 
-    if (!user) {
-      throw new ApiError(HttpStatus.NOT_FOUND, `User Not Found`);
+        const jwtPayload = {
+            id: userData.id,
+            role: userData.role,
+            email: userData.email,
+        };
+
+        const accessToken = this.jwtService.signAsync(jwtPayload, {
+            secret: config.jwt.jwt_secret,
+            expiresIn: config.jwt.jwt_secret_expires_in,
+        });
+
+        return {
+            data: { accessToken },
+            message: "Access Token generated",
+        };
     }
 
-    const payload = {
-      email: user.email,
-      role: user.role,
-    };
+    async resetPassword(payload: ResetPasswordDto) {
+        let decrypted;
 
-    console.log(user.email,'checking the email sending here');
+        try {
+            decrypted = this.jwtService.verifyAsync(payload.token, {
+                secret: config.jwt.reset_token_secret,
+            });
+        } catch {
+            throw new ApiError(HttpStatus.BAD_REQUEST, "Invalid Token");
+        }
 
-    const resetPassToken = this.jwtService.signAsync(payload);
+        const userData = await this.prisma.user.findUnique({
+            where: {
+                email: decrypted.email,
+            },
+        });
 
-    const resetPasswordLink =`${process.env.RESET_PASSWORD_LINK}/reset-password?userId=${user.id}&token=${resetPassToken}`;
+        if (!userData) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "User not found");
+        }
 
-    const emailSending = {
-      to: [ user?.email],
-      subject: 'FourteenCapital - Reset Your Password',
-      template: `<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Password Reset Request</title>
-    </head>
-    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa; margin: 0; padding: 20px; line-height: 1.6; color: #333333;">
-        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
-            <div style="background-color: #FF7600; padding: 30px 20px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Password Reset Request</h1>
-            </div>
-            <div style="padding: 40px 30px;">
-                <p style="font-size: 16px; margin-bottom: 20px;">Dear User,</p>
-                
-                <p style="font-size: 16px; margin-bottom: 30px;">We received a request to reset your password. Click the button below to reset your password:</p>
-                
-                <div style="text-align: center; margin-bottom: 30px;">
-                    <a href=${resetPasswordLink} style="display: inline-block; background-color: #FF7600; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: 600; transition: background-color 0.3s ease;">
-                        Reset Password
-                    </a>
-                </div>
-                
-                <p style="font-size: 16px; margin-bottom: 20px;">If you did not request a password reset, please ignore this email or contact support if you have any concerns.</p>
-                
-                <p style="font-size: 16px; margin-bottom: 0;">Best regards,<br>Your Support Team</p>
-            </div>
-            <div style="background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 14px; color: #6c757d;">
-                <p style="margin: 0 0 10px;">This is an automated message, please do not reply to this email.</p>
-                <p style="margin: 0;">© 2023 Your Company Name. All rights reserved.</p>
-            </div>
-        </div>
-    </body>
-    </html>`,
-      // optional:
-      // cc: [ { email: 'boss@company.com', name: 'Boss' } ],
-      // bcc: [ ... ],
-      // textContent: 'Plain-text fallback here',
-      // attachmentUrls: ['https://.../file.pdf'],
-    };
+        const password = await this.bcryptService.hash(payload.password);
 
-    await sendEmail(emailSending);
-
-    return {
-      message: 'Reset password link sent via your email successfully',
-    };
-  }
-
-  async resetPassword({
-    token,
-    payload: { id, password },
-  }: {
-    token: string;
-    payload: { id: string; password: string };
-  }) {
-    const user = this.usersService.getOne({ email: id });
-
-    console.log(`see user`, user);
-
-    if (!user) {
-      throw new ApiError(HttpStatus.NOT_FOUND, `User Not Found`);
+        await this.prisma.user.update({
+            where: {
+                id: userData.id,
+            },
+            data: {
+                password,
+            },
+        });
+        return { message: "Password Reset successful" };
     }
-
-    const isValidToken = await this.jwtService.verifyAsync(token);
-
-    if (!isValidToken) {
-      throw new ApiError(HttpStatus.FORBIDDEN, `Forbidden`);
-    }
-
-    const hashPassword = await this.bcryptService.hash(password);
-
-    await this.usersService.updatePassword({
-      id: (await user)?.id,
-      password: hashPassword,
-    });
-  }
 }

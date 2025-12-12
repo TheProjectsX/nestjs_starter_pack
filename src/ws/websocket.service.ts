@@ -1,140 +1,142 @@
-// src/websocket/websocket.service.ts
-import { PrismaService } from '@/helper/prisma.service';
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { HttpAdapterHost } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
-import { WebSocket, WebSocketServer } from 'ws';
+// /* eslint-disable @typescript-eslint/no-explicit-any */
 
-interface ExtendedWebSocket extends WebSocket {
-  userId?: string;
-}
+// // src/websocket/websocket.service.ts
+// import { PrismaService } from '@/helper/prisma.service';
+// import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+// import { ConfigService } from '@nestjs/config';
+// import { HttpAdapterHost } from '@nestjs/core';
+// import { JwtService } from '@nestjs/jwt';
+// import { WebSocket, WebSocketServer } from 'ws';
 
-@Injectable()
-export class WebSocketService implements OnApplicationBootstrap {
-  private wss: WebSocketServer;
-  private readonly onlineUsers = new Set<string>();
-  private readonly userSockets = new Map<string, ExtendedWebSocket>();
+// interface ExtendedWebSocket extends WebSocket {
+//   userId?: string;
+// }
 
-  constructor(
-    private httpAdapterHost: HttpAdapterHost,
-    private prisma: PrismaService,
-    private jwt: JwtService,
-    private config: ConfigService,
-  ) {}
+// @Injectable()
+// export class WebSocketService implements OnApplicationBootstrap {
+//   private wss: WebSocketServer;
+//   private readonly onlineUsers = new Set<string>();
+//   private readonly userSockets = new Map<string, ExtendedWebSocket>();
 
-  onApplicationBootstrap(): void {
-    const httpServer = this.httpAdapterHost.httpAdapter.getHttpServer();
-    this.wss = new WebSocketServer({ server: httpServer });
-    this.setupListeners();
-    console.log('WebSocket server initialized');
-  }
+//   constructor(
+//     private httpAdapterHost: HttpAdapterHost,
+//     private prisma: PrismaService,
+//     private jwt: JwtService,
+//     private config: ConfigService,
+//   ) {}
 
-  private setupListeners(): void {
-    this.wss.on('connection', (ws: ExtendedWebSocket) => {
-      console.log('A user connected');
+//   onApplicationBootstrap(): void {
+//     const httpServer = this.httpAdapterHost.httpAdapter.getHttpServer();
+//     this.wss = new WebSocketServer({ server: httpServer });
+//     this.setupListeners();
+//     console.log('WebSocket server initialized');
+//   }
 
-      ws.on('message', async (data: Buffer) => {
-        try {
-          const parsedData = JSON.parse(data.toString());
-          switch (parsedData.event) {
-            case 'authenticate': {
-              const token = parsedData.token;
-              if (!token) {
-                console.log('No token provided');
-                ws.close();
-                return;
-              }
-              const decoded = this.jwt.verify(token, {
-                secret: this.config.get('JWT_SECRET'),
-              });
-              if (!decoded) {
-                console.log('Invalid token');
-                ws.close();
-                return;
-              }
-              const { id } = decoded;
-              ws.userId = id;
-              this.onlineUsers.add(id);
-              this.userSockets.set(id, ws);
-              this.broadcast({
-                event: 'status',
-                data: { userId: id, isOnline: true },
-              });
-              break;
-            }
+//   private setupListeners(): void {
+//     this.wss.on('connection', (ws: ExtendedWebSocket) => {
+//       console.log('A user connected');
 
-            case 'joinRoom': {
-              const { roomId } = parsedData.data || {};
-              if (!ws.userId || !roomId) return;
+//       ws.on('message', async (data: Buffer) => {
+//         try {
+//           const parsedData = JSON.parse(data.toString());
+//           switch (parsedData.event) {
+//             case 'authenticate': {
+//               const token = parsedData.token;
+//               if (!token) {
+//                 console.log('No token provided');
+//                 ws.close();
+//                 return;
+//               }
+//               const decoded = this.jwt.verify(token, {
+//                 secret: this.config.get('JWT_SECRET'),
+//               });
+//               if (!decoded) {
+//                 console.log('Invalid token');
+//                 ws.close();
+//                 return;
+//               }
+//               const { id } = decoded;
+//               ws.userId = id;
+//               this.onlineUsers.add(id);
+//               this.userSockets.set(id, ws);
+//               this.broadcast({
+//                 event: 'status',
+//                 data: { userId: id, isOnline: true },
+//               });
+//               break;
+//             }
 
-              const room = await this.prisma.room.findUnique({
-                where: { id: roomId },
-              });
-              if (!room) {
-                ws.send(
-                  JSON.stringify({ event: 'error', message: 'Room not found' }),
-                );
-                return;
-              }
+//             case 'joinRoom': {
+//               const { roomId } = parsedData.data || {};
+//               if (!ws.userId || !roomId) return;
 
-              try {
-                await this.prisma.roomUser.create({
-                  data: { userId: ws.userId, roomId },
-                });
-                ws.send(
-                  JSON.stringify({ event: 'joinedRoom', data: { roomId } }),
-                );
-              } catch (err) {
-                if ((err as any).code === 'P2002') {
-                  ws.send(
-                    JSON.stringify({
-                      event: 'alreadyInRoom',
-                      data: { roomId },
-                    }),
-                  );
-                } else {
-                  console.error('Join room failed:', err);
-                  ws.send(
-                    JSON.stringify({
-                      event: 'error',
-                      message: 'Failed to join room',
-                    }),
-                  );
-                }
-              }
-              break;
-            }
+//               const room = await this.prisma.room.findUnique({
+//                 where: { id: roomId },
+//               });
+//               if (!room) {
+//                 ws.send(
+//                   JSON.stringify({ event: 'error', message: 'Room not found' }),
+//                 );
+//                 return;
+//               }
 
-            // Add cases for leaveRoom, message, etc., similarly refactored
+//               try {
+//                 await this.prisma.roomUser.create({
+//                   data: { userId: ws.userId, roomId },
+//                 });
+//                 ws.send(
+//                   JSON.stringify({ event: 'joinedRoom', data: { roomId } }),
+//                 );
+//               } catch (err) {
+//                 if ((err as any).code === 'P2002') {
+//                   ws.send(
+//                     JSON.stringify({
+//                       event: 'alreadyInRoom',
+//                       data: { roomId },
+//                     }),
+//                   );
+//                 } else {
+//                   console.error('Join room failed:', err);
+//                   ws.send(
+//                     JSON.stringify({
+//                       event: 'error',
+//                       message: 'Failed to join room',
+//                     }),
+//                   );
+//                 }
+//               }
+//               break;
+//             }
 
-            default:
-              console.warn(`Unknown event: ${parsedData.event}`);
-          }
-        } catch (error) {
-          console.error('Error handling message:', error);
-        }
-      });
+//             // Add cases for leaveRoom, message, etc., similarly refactored
 
-      ws.on('close', () => {
-        if (ws.userId) {
-          this.onlineUsers.delete(ws.userId);
-          this.userSockets.delete(ws.userId);
-          this.broadcast({
-            event: 'status',
-            data: { userId: ws.userId, isOnline: false },
-          });
-        }
-        console.log('User disconnected');
-      });
-    });
-  }
+//             default:
+//               console.warn(`Unknown event: ${parsedData.event}`);
+//           }
+//         } catch (error) {
+//           console.error('Error handling message:', error);
+//         }
+//       });
 
-  private broadcast(message: any): void {
-    this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(message));
-      }
-    });
-  }
-}
+//       ws.on('close', () => {
+//         if (ws.userId) {
+//           this.onlineUsers.delete(ws.userId);
+//           this.userSockets.delete(ws.userId);
+//           this.broadcast({
+//             event: 'status',
+//             data: { userId: ws.userId, isOnline: false },
+//           });
+//         }
+//         console.log('User disconnected');
+//       });
+//     });
+//   }
+
+//   private broadcast(message: any): void {
+//     this.wss.clients.forEach((client) => {
+//       if (client.readyState === WebSocket.OPEN) {
+//         client.send(JSON.stringify(message));
+//       }
+//     });
+//   }
+// }

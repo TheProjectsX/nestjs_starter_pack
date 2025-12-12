@@ -1,126 +1,93 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-} from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { IsPublic } from './auth.decorator';
-import { Request } from 'express';
-import { ResponseService } from '@/utils/response';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserService } from '../user/user.service';
-import { Roles } from './roles.decorator';
-import { Role } from '@prisma/client';
+    Body,
+    Controller,
+    HttpCode,
+    HttpStatus,
+    Post,
+    Req,
+} from "@nestjs/common";
+import { AuthService } from "./auth.service";
+import { LoginUserDto } from "./dto/login.dto";
+import { IsPublic } from "@/decorators/auth.decorator";
+import { Request } from "express";
+import { ResponseService } from "@/utils/response";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { RegisterUserDto } from "./dto/register.dto";
+import { ChangePasswordDto } from "./dto/changePassword.dto";
+import { ResetPasswordDto } from "./dto/resetPassword.dto";
+import { JwtPayload } from "@/interface/jwtPayload";
 
-
-@ApiTags('Auth')
-@Controller('auth')
+@ApiTags("Auth")
+@Controller("auth")
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-  ) { }
+    constructor(private authService: AuthService) {}
 
+    @HttpCode(HttpStatus.CREATED)
+    @IsPublic()
+    @Post("register")
+    @ApiOperation({ summary: "Register new User account" })
+    async register(@Body() payload: RegisterUserDto) {
+        const result = await this.authService.register(payload);
 
-  @HttpCode(HttpStatus.OK)
-  @IsPublic()
-  @Post('register')
-  @ApiOperation({ summary: 'User Register' })
-  async register(@Body() registerDto: any) {
-    const result = await this.authService.RegisterUser(registerDto);
-    return ResponseService.formatResponse({
-      statusCode: HttpStatus.OK,
-      message: 'User Register successfully',
-      data: result,
-    });
-  }
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "OTP Sent to your Email",
+            data: result,
+        });
+    }
 
-  @HttpCode(HttpStatus.OK)
-  @IsPublic()
-  @Post('login')
-  @ApiOperation({ summary: 'User Login' })
-  async signIn(
-    @Body() loginDto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.login(loginDto);
-    return ResponseService.formatResponse({
-      statusCode: HttpStatus.OK,
-      message: 'User Login successfully',
-      data: result,
-    });
-  }
+    @HttpCode(HttpStatus.OK)
+    @IsPublic()
+    @Post("login")
+    @ApiOperation({ summary: "Login User" })
+    async signIn(@Body() payload: LoginUserDto) {
+        const result = await this.authService.loginWithEmail(payload);
 
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  @Get('get-me')
-  async getProfile(@Req() req: Request) {
-    const user: any = req?.user;
-    const result = await this.authService.getMe(user);
-    return ResponseService.formatResponse({
-      statusCode: HttpStatus.OK,
-      message: 'Getme Found successfully',
-      data: result,
-    });
-  }
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "User Login successful",
+            data: result,
+        });
+    }
 
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  @Post('change-password')
-  async changePassword(
-    @Body() data: { prevPass: string; newPass: string },
-    @Req() req: Request,
-  ) {
-    const user: any = req?.user;
-    const id: string = user?.id;
-    const result = await this.authService.changePassword({ ...data, id });
+    @Post("change-password")
+    async changePassword(
+        @Body() payload: ChangePasswordDto,
+        @Req() req: Request,
+    ) {
+        const result = await this.authService.changePassword(
+            payload,
+            req.user as JwtPayload,
+        );
 
-    return ResponseService.formatResponse({
-      statusCode: HttpStatus.OK,
-      message: 'Password Changed successfully',
-      data: result,
-    });
-  }
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "Password Changed successfully",
+            data: result,
+        });
+    }
 
-  @IsPublic()
-  @Post('forgot-password')
-  async forgotPasswod(@Body() data: { email: string }) {
-    console.log("excution project here/11");
-    const result = await this.authService.forgetPassword({
-      email: data?.email,
-    });
-    return ResponseService.formatResponse({
-      statusCode: HttpStatus.OK,
-      message: 'Forget Password Mail Sent successfully',
-      data: result,
-    });
-  }
+    @IsPublic()
+    @Post("forgot-password")
+    async forgotPassword(@Body() payload: { email: string }) {
+        const result = await this.authService.forgotPassword(payload);
 
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "Password Reset Instructions sent to Email",
+            data: result,
+        });
+    }
 
-  @Post('reset-password')
-  async resetPassword(
-    @Headers('authorization') token: string,
-    @Body() payload: { prevPass: string; newPass: string },
-    @Req() req: Request
-  ) {
-    const user: any = req?.user;
+    @IsPublic()
+    @Post("reset-password")
+    async resetPassword(@Body() payload: ResetPasswordDto) {
+        const result = await this.authService.resetPassword(payload);
 
-    const result = await this.authService.resetPassword({
-      token,
-      payload: {
-        id: user?.id,
-        password: payload.newPass,
-      },
-    });
-
-    return ResponseService.formatResponse({
-      statusCode: HttpStatus.OK,
-      message: 'Password Resetted successfully',
-      data: result,
-    });
-  }
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "Password Reset successful",
+            data: result,
+        });
+    }
 }

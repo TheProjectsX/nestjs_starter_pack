@@ -1,3 +1,3 @@
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
-export const SkipRateLimit = () => SetMetadata('skipRateLimit', true);
+export const SkipRateLimit = () => SetMetadata("skipRateLimit", true);
