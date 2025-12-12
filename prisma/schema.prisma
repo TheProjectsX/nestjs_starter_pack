@@ -1,0 +1,505 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator dbml {
+  provider = "prisma-dbml-generator"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(auto()) @map("_id") @db.ObjectId
+  username         String?
+  email            String             @unique
+  description      String?
+  contactNo        String             @unique
+  password         String
+  lang             Lang               @default(ENG)
+  role             Role               @default(TRADER)
+  avatar           String?
+  isVerified       Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  admin            Admin?
+  trader           Trader?
+  verifications    UserVerification[]
+  sentMessages     Chat[]             @relation("UserSentMessages")
+  receivedMessages Chat[]             @relation("UserReciveMessage")
+  uploadedFile     UploadedFile[]
+  roomUser         RoomUser[]
+  messageRead      MessageRead[]
+  notification     Notification[]
+  createdRooms     Room[]  
+
+  @@map("users")
+}
+
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  UNVERIFIED
+}
+
+model UserVerification {
+  id               String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String             @unique @db.ObjectId
+  token            String?            @unique
+  otp              String?
+  documentUrl      String[]
+  verificationType VerificationStatus @default(UNVERIFIED)
+  createdAt        DateTime           @default(now())
+  expiresAt        DateTime
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_verifications")
+}
+
+model Admin {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  isActive  Boolean  @default(true)
+  fastName  String?
+  lastName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Trader {
+  id                  String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String             @unique @db.ObjectId
+  user                User               @relation(fields: [userId], references: [id])
+  isActive            Boolean            @default(true)
+  stripeAccountId     String?
+  fastName            String?
+  lastName            String?
+  skills              String[]
+  mininumHoulyRate    Float?
+  nationality         String?
+  tagline             String[]
+  description         String?
+  attachments         String[]
+  resumeFile          String?
+  socialMediaLink     String[]
+  isVerified          Boolean            @default(false)
+  isDeleted           Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  offerByTrader       Task_Application[]
+  traderOwner         Favourite[]        @relation("traderOwner")
+  favoriteByTrader    Favourite[]        @relation("favoriteByTrader")
+  tasks               Task[]
+  Bosting_task        Bosting_task[]
+  reviewProvider      Review[]           @relation("reviewProvider")
+  reviewReceiver      Review[]           @relation("reviewReceiver")
+  refferingByTrader   TraderRefferIng[]  @relation("RefferingByTrader")
+  refferingTraderList TraderRefferIng[]  @relation("RefferingTraderList")
+  payment             Payment[]
+  subscription        Subscription[]
+
+  @@map("traders")
+}
+
+model TraderRefferIng {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  traderId            String   @db.ObjectId
+  trader              Trader  @relation("RefferingByTrader", fields: [traderId], references: [id])
+  referringCount      Float    @default(0)
+  refferingId         String?   @db.ObjectId
+  refferingTraderList Trader?   @relation("RefferingTraderList", fields: [refferingId], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Category {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  name        String        @unique
+  files       String[]
+  icon        String?
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  SubCategory SubCategory[]
+  tasks       Task[]
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  categoryId  String   @db.ObjectId
+  files       String[]
+  icon        String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  category    Category @relation(fields: [categoryId], references: [id])
+  tasks       Task[]
+
+  @@map("sub_categories")
+}
+
+enum TaskType {
+  CASH
+  PAYMENT
+}
+
+enum TaskStatus {
+  IN_PROGRESS
+  ORDER_ACTIVE
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+model Task {
+  id                  String             @id @default(auto()) @map("_id") @db.ObjectId
+  title               String
+  taskType            TaskType           @default(PAYMENT)
+  location            String?
+  max_salary          Float?
+  min_salary          Float?
+  require_skills      String[]
+  provide_attachments String[]
+  description         String?
+  deadline            DateTime?
+  tags                String[]
+  files               String[]
+  isActive            Boolean            @default(true)
+  status              TaskStatus         @default(IN_PROGRESS)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  traderId            String?            @db.ObjectId
+  trader              Trader?            @relation(fields: [traderId], references: [id])
+  categoryid          String             @db.ObjectId
+  category            Category           @relation(fields: [categoryid], references: [id])
+  subCategoryid       String?            @db.ObjectId
+  subCategory         SubCategory?       @relation(fields: [subCategoryid], references: [id])
+  favourites          Favourite[]
+  bosting_tasks       Bosting_task[]
+  task_Application    Task_Application[]
+  review              Review[]
+  payment             Payment[]
+
+  @@map("tasks")
+}
+
+enum AplicationStatus {
+  IN_PROGRESS
+  REJECTED
+  APPROVED
+}
+
+model Task_Application {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  status        AplicationStatus @default(IN_PROGRESS)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  offerId       String           @db.ObjectId
+  offerByTrader Trader           @relation(fields: [offerId], references: [id])
+  taskId        String           @db.ObjectId
+  task          Task             @relation(fields: [taskId], references: [id])
+
+  @@map("task_applications")
+}
+
+enum FavouriteType {
+  TASK
+  TRADER
+}
+
+model Favourite {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  type               FavouriteType @default(TASK)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  traderOwnerId      String        @db.ObjectId
+  traderOwner        Trader        @relation("traderOwner", fields: [traderOwnerId], references: [id])
+  favoriteByTraderId String?       @db.ObjectId
+  favoriteByTrader   Trader?       @relation("favoriteByTrader", fields: [favoriteByTraderId], references: [id])
+  taskId             String?       @db.ObjectId
+  task               Task?         @relation(fields: [taskId], references: [id])
+
+  @@map("favourites")
+}
+
+model Review {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId           String   @db.ObjectId
+  rating           Int
+  comment          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  task             Task     @relation(fields: [taskId], references: [id])
+  reviewReceiverId String?  @db.ObjectId
+  reviewReceiver   Trader?  @relation("reviewReceiver", fields: [reviewReceiverId], references: [id])
+  reviewProviderId String?  @db.ObjectId
+  reviewProvider   Trader?  @relation("reviewProvider", fields: [reviewProviderId], references: [id])
+
+  @@map("reviews")
+}
+
+enum Bosting_Status {
+  ACTIVE
+  INACTIVE
+  CANCELED
+}
+
+model Bosting_task {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  taskId    String         @db.ObjectId
+  traderId  String         @db.ObjectId
+  status    Bosting_Status @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  task      Task           @relation(fields: [taskId], references: [id])
+  trader    Trader         @relation(fields: [traderId], references: [id])
+  payment   Payment[]
+
+  @@map("bosting_tasks")
+}
+
+model Subscription {
+  id                   String             @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionPlanId   String             @db.ObjectId
+  subscriptionPlan     SubscriptionPlan   @relation(fields: [subscriptionPlanId], references: [id])
+  ownerId              String             @db.ObjectId
+  trader               Trader             @relation(fields: [ownerId], references: [id])
+  subscriptionStatus   SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?
+  stripeCustomerId     String?
+  expiresAt            DateTime
+  createdAt            DateTime           @default(now())
+  cancelRequest        Boolean            @default(false)
+  payments             Payment[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionPlan {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  plan            SubscribePlan  @unique @default(PRO_PLAN)
+  name            String
+  description     String
+  featuresList    String[]
+  trialPeriod     Boolean        @default(false)
+  price           Float          @default(0)
+  stripeProductId String?
+  stripePriceId   String?        @default("")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  subscription    Subscription[]
+
+  @@map("subscription_plans")
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  BOOTS_PAYMENT
+  TASK_PAYMENT
+}
+
+model Payment {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  paymentType        PaymentType   @default(TASK_PAYMENT)
+  amount             Float
+  currency           String
+  paymentOwnerId     String?
+  paymentStatus      PaymentStatus
+  subscriptionId     String?       @db.ObjectId
+  traderId           String?       @db.ObjectId
+  taskId             String?       @db.ObjectId
+  subscriptionPlanId String?
+  stripePaymentId    String?
+  bostingId          String?       @db.ObjectId
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  subscription       Subscription? @relation(fields: [subscriptionId], references: [id])
+  trader             Trader?       @relation(fields: [traderId], references: [id])
+  task               Task?         @relation(fields: [taskId], references: [id])
+  bosting            Bosting_task? @relation(fields: [bostingId], references: [id])
+
+  @@map("payments")
+}
+
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  body      String
+  data      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}
+
+enum RoomType {
+  SINGLE
+  GROUP
+  PRIVATE
+  BROADCAST
+}
+
+model Room {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  type        RoomType @default(GROUP)  
+  img         String?
+  createdBy   String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  creator     User       @relation(fields: [createdBy], references: [id])
+  roomUsers   RoomUser[]
+  chat        Chat[]
+  uploadedFiles UploadedFile[]
+
+  @@map("rooms")
+}
+
+enum MemberType {
+    ADMIN
+    MEMEBER
+    MODARETOR    
+}
+
+model RoomUser {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId    String   @db.ObjectId
+  userId    String   @db.ObjectId
+  role      MemberType   @default(MEMEBER) 
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  room      Room     @relation(fields: [roomId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  @@unique([roomId, userId])
+  @@map("room_users")
+}
+
+enum MessageType {
+  TEXT
+  FILE
+}
+
+model Chat {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  message     String
+  messageType MessageType   @default(TEXT) 
+  images      String[]
+  fileId      String?  @db.ObjectId
+  replyToId   String?  @db.ObjectId
+  isRead      Boolean  @default(false)
+  isEdited    Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  senderId    String   @db.ObjectId
+  roomId      String?   @db.ObjectId
+  receiverId  String   @db.ObjectId
+  sender      User          @relation("UserSentMessages", fields: [senderId], references: [id])
+  reciver     User          @relation("UserReciveMessage", fields: [receiverId], references: [id])
+  room        Room?           @relation(fields: [roomId], references: [id])
+  file        UploadedFile?  @relation(fields: [fileId], references: [id])
+  messageRead MessageRead[]
+
+  @@map("chats")
+}
+
+model MessageRead {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  messageId String   @db.ObjectId
+  userId    String   @db.ObjectId
+  readAt    DateTime @default(now())
+  
+  message   Chat     @relation(fields: [messageId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@map("message_reads")
+}
+
+enum FileType {
+   VIDEO
+   AUDIO
+   IMAGE
+   FILE
+}
+
+model UploadedFile {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  originalName String?
+  filename     String?
+  path         String?
+  size         Int?
+  urls          String[]
+  mimeType     String?
+  fileType     FileType    @default(FILE)
+  uploadedBy   String   @db.ObjectId
+  roomId       String?   @db.ObjectId
+  createdAt    DateTime @default(now())
+  
+  uploader     User     @relation(fields: [uploadedBy], references: [id])
+  room         Room?     @relation(fields: [roomId], references: [id])
+  chat         Chat[]
+
+
+  @@map("uploaded_files")
+}
+
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  TRADER
+}
+
+enum Lang {
+  ENG
+  ARB
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  CANCELLED
+  PAST_DUE
+}
+
+enum SubscribePlan {
+  PRO_PLAN
+  ELITE_PLAN
+}
+
+enum PaymentMethod {
+  STRIPE
+  PAYPAL
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD
+  REQUIRES_CONFIRMATION
+  REQUIRES_ACTION
+  PROCESSING
+  REQUIRES_CAPTURE
+  CANCELED
+  SUCCEEDED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+  ON_HOLD
+}

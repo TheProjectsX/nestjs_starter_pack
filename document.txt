@@ -1,0 +1,265 @@
+Authentication : 
+         ( Optional)   FireBase Authentication :  
+                                Google :  
+                                Facebook: 
+                                GitHub: 
+                                Password && Email:  
+         (Required)   LocalLogin: 
+                                My System: 
+                                   RegisterTime Feild get : 
+                                                    name 
+                                                    Email
+                                                    Password
+
+Verification Processing: ( ) 
+            user Should Verficiation : 
+
+                    user fast create Register after  =>  the create account in stripe  => generateOnboardingLink > getRedirectLink  to frontned url for => customer provide there info ( bank , nationalId Card nessceryInfo) KYC info
+                    
+
+
+Subscription : ()
+            RecursiveSubscripiton:
+
+                    Two Type of Plan 
+                        Pro Plan : 
+                                3 tread Listing
+                                TradeWith up to 3 People 
+                        ElitePlan:
+                                Unlimited Listing 
+                                Verified Badge In profile
+
+                                ProfileAddOption: 
+                                            Resume
+                                            portfolio
+                                            social Links
+
+                                Free Monthly Sponsored Trade Boosts
+
+                                            Tread Boots
+                                            Recommend Users
+                                            Need Skills Match User Show On Searcing Trade with Tags
+
+
+            Boots
+                    2Type of Boots:
+
+
+
+Task Handle : 
+
+            TaskCreate:         
+                    All Feild Task TaskCreate
+            
+            TaskRequest && offers:
+                    Difrent Model 
+                            Requestid + taskid
+                            Offerid     + taskid0
+                            status: Inprogress, active, complate , fail
+                            isSumit: false / true
+                            files:
+
+            Task OffersAccept: 
+                    if Status: is Inprogress  tails offers Accept korte parbe na , take payment korte hobe , tar por task status change hobe ( active)
+                                status cahnge hobe two option 
+                                            manully 
+                                            automaticaly
+            taskSubmit:  
+                      if user taskSubmit kore taile  task status jodi complate hy taile payment system a jabe 
+
+            Taka Return akta sujuk rakte hobe !! jodi task not accept hy taile retrun akta sujug rakte hobe , 
+
+
+
+Verification akta system rakte hobe : 
+
+
+Reffering System: 
+ 
+
+Chat System : 
+            Room
+            Single
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=================================  Stripe OnBaording System Connect with Business Modal ========================
+
+Marketplace : should be include Here’s
+
+
+
+Yes — ✅ you got it exactly right.
+Let me now confirm and refine your flow so you can implement it confidently.
+
+🧩 FULL FLOW — Marketplace with Stripe Connect + Subscriptions
+Here’s how it works step-by-step in your app:
+
+✅ 1. User Registers in Your App
+Fill in name, email, password
+
+Stored in your DB
+
+✅ 2. Create Stripe Connect (Express) Account
+When user registers or visits onboarding:
+
+ts
+Copy
+Edit
+const account = await stripe.accounts.create({
+  type: 'express',
+  email: user.email,
+});
+Store account.id in your database (acct_...)
+
+✅ 3. Redirect to Onboarding (KYC + Bank Info)
+Generate onboarding link:
+
+ts
+Copy
+Edit
+const link = await stripe.accountLinks.create({
+  account: account.id,
+  type: 'account_onboarding',
+  refresh_url: '<your-site>/retry',
+  return_url: '<your-site>/done',
+});
+➡️ User submits:
+
+National ID / Passport
+
+Bank account info
+
+Personal address, DOB
+
+✅ Stripe handles KYC, security, compliance.
+
+✅ 4. Stripe Verifies the User
+Stripe checks the info:
+
+✅ If passed → account is charges_enabled = true & payouts_enabled = true
+
+❌ If failed → Stripe asks them to re-submit
+
+You should check status before allowing payouts.
+
+✅ 5. User Subscribes to Your Platform (if required)
+If users must have a subscription to work:
+
+Create a Stripe Checkout Session for subscription
+
+ts
+Copy
+Edit
+const session = await stripe.checkout.sessions.create({
+  mode: 'subscription',
+  payment_method_types: ['card'],
+  line_items: [{ price: 'price_xxx', quantity: 1 }],
+  customer_email: user.email,
+  success_url: '<your-site>/success',
+  cancel_url: '<your-site>/cancel',
+});
+➡️ Redirect them to session.url
+
+✅ They pay using Card only, as required
+
+✅ 6. User Can Start Tasking
+After subscription is active:
+
+User can accept/post/complete tasks
+
+Your app keeps track of task status
+
+✅ 7. Customer Pays for Task → Platform Charges
+You (platform) collect money when:
+
+Task is started, OR
+
+Task is completed
+
+Use destination charge so money is sent to the freelancer:
+
+ts
+Copy
+Edit
+const paymentIntent = await stripe.paymentIntents.create({
+  amount: 5000,
+  currency: 'usd',
+  payment_method_types: ['card'],
+  application_fee_amount: 500, // your platform fee
+  transfer_data: {
+    destination: 'acct_1234...', // freelancer's account
+  },
+});
+✅ Stripe splits payment: freelancer gets their share, you keep fee.
+
+✅ 8. User Gets Paid to Their Bank (via Stripe)
+Stripe pays the freelancer automatically:
+
+Bank info was added earlier during onboarding
+
+They don’t need to do anything
+
+Money arrives in bank in 2–5 days
+
+✅ 9. (Optional) Freelancer Can View Their Stripe Express Dashboard
+If you want to let them see balance, payout schedule:
+
+ts
+Copy
+Edit
+const loginLink = await stripe.accounts.createLoginLink('acct_1234...');
+➡️ You can show a "View Stripe Dashboard" button
+➡️ Or show Withdraw button in your app and link them
+
+❗ But they don’t need this to get paid — it's optional
+
+✅ Final User Experience Summary
+Step	What User Does	What You Do
+Register	✅ Enters name, email	✅ Save user
+Onboarding	✅ Provide ID, Bank info	✅ Create Connect account + link
+Wait	⏳ Stripe verifies	✅ Poll or webhook account.updated
+Subscribe	✅ Pay with card	✅ Create Checkout session
+Task	✅ Work	✅ Track task
+Get paid	✅ See "Withdraw" or Stripe Dashboard	✅ Charge customer, split payment
+Payout	✅ Money goes to their bank	✅ All via Stripe automatically
+
+✅ All Controls Are in Your App
+You decide when to let them work
+
+You decide when to pay them
+
+You control subscriptions
+
+You provide optional Stripe dashboard link
+
+Stripe does:
+
+KYC
+
+Secure bank transfer
+
+Legal compliance
+
+Let me know if you want:
+✅ Sample backend code (NestJS/Express)
+
+✅ Stripe webhook setup
+
+✅ UI flow (user side)
+
+✅ Role management system (customer vs freelancer)
+
+You're 90% there — now it's about coding the logic into your app!
+                        
