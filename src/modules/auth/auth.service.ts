@@ -39,6 +39,7 @@ export class AuthService {
 
         const hashedPassword: string = await this.bcryptService.hash(
             payload.password,
+            config.password.salt,
         );
         const response = await this.prisma.user.create({
             data: { ...payload, otp, otpExpiry, password: hashedPassword },
@@ -236,6 +237,7 @@ export class AuthService {
 
         const hashedPassword = await this.bcryptService.hash(
             payload.newPassword,
+            config.password.salt,
         );
 
         await this.prisma.user.update({
@@ -350,7 +352,10 @@ export class AuthService {
             throw new ApiError(HttpStatus.NOT_FOUND, "User not found");
         }
 
-        const password = await this.bcryptService.hash(payload.password);
+        const password = await this.bcryptService.hash(
+            payload.password,
+            config.password.salt,
+        );
 
         await this.prisma.user.update({
             where: {

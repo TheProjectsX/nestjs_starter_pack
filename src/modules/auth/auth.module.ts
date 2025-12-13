@@ -7,20 +7,14 @@ import { JwtModule } from "@nestjs/jwt";
 import { BcryptService } from "src/utils/bcrypt.service";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-import config from "@/config";
 
 @Module({
     imports: [
         HttpModule.register({
             timeout: 5000,
-
             maxRedirects: 5,
         }),
-        JwtModule.register({
-            global: true,
-            secret: config.jwt.jwt_secret,
-            signOptions: { expiresIn: "7d" },
-        }),
+        JwtModule.register({ global: true }),
     ],
     providers: [
         AuthService,

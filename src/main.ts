@@ -4,8 +4,10 @@ import * as cookieParser from "cookie-parser";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "@/app/app.module";
+import type { Request, Response } from "express";
 import * as fs from "fs";
 import * as express from "express";
+import * as os from "os";
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -27,6 +29,17 @@ async function bootstrap() {
             "Authorization",
             "Access-Control-Allow-Origin",
         ],
+    });
+
+    // To check the server status
+    const nativeApp = app.getHttpAdapter().getInstance();
+    nativeApp.get("/", (req: Request, res: Response) => {
+        res.send({
+            success: true,
+            message: "El Psy Congroo!",
+            server_name: "nestjs_starter_pack",
+            server_type: "WEB",
+        });
     });
 
     app.use("/api/v1/webhook", express.raw({ type: "application/json" }));
@@ -62,7 +75,23 @@ async function bootstrap() {
     fs.writeFileSync("./swagger-spec.json", JSON.stringify(document));
 
     await app.listen(port);
-    console.log(`Application is running on: ${await app.getUrl()}`);
+    const url = await app.getUrl(); // default: http://[::1]:5000
+
+    // Get local network IP
+    const interfaces = os.networkInterfaces();
+    let localIP = "127.0.0.1";
+
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]!) {
+            if (iface.family === "IPv4" && !iface.internal) {
+                localIP = iface.address;
+            }
+        }
+    }
+
+    console.log(`\nApplication is running on:`);
+    console.log(`  localhost: http://localhost:${port}`);
+    console.log(`  network:   http://${localIP}:${port}`);
 }
 
 bootstrap();

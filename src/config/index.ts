@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
-import path from "path";
+import * as dotenv from "dotenv";
+import * as path from "path";
 
 dotenv.config({ path: path.join(process.cwd(), ".env") });
 
@@ -21,11 +21,21 @@ export default {
     },
     jwt: {
         jwt_secret: process.env.JWT_SECRET,
-        jwt_secret_expires_in: process.env.JWT_SECRET_EXPIRES_IN,
+        jwt_secret_expires_in: isNaN(Number(process.env.JWT_SECRET_EXPIRES_IN))
+            ? 604800
+            : Number(process.env.JWT_SECRET_EXPIRES_IN),
         refresh_token_secret: process.env.REFRESH_TOKEN_SECRET,
-        refresh_token_expires_in: process.env.REFRESH_TOKEN_EXPIRES_IN,
+        refresh_token_expires_in: isNaN(
+            Number(process.env.REFRESH_TOKEN_EXPIRES_IN),
+        )
+            ? 2592000
+            : Number(process.env.REFRESH_TOKEN_EXPIRES_IN),
         reset_token_secret: process.env.RESET_TOKEN_SECRET,
-        reset_token_expires_in: process.env.RESET_TOKEN_EXPIRES_IN,
+        reset_token_expires_in: isNaN(
+            Number(process.env.RESET_TOKEN_EXPIRES_IN),
+        )
+            ? 900
+            : Number(process.env.RESET_TOKEN_EXPIRES_IN),
     },
     smtp: {
         host: process.env.SMTP_HOST,
@@ -50,6 +60,8 @@ export default {
         bucketName: process.env.AWS_BUCKET_NAME,
     },
     password: {
-        salt: process.env.PASSWORD_SALT,
+        salt: isNaN(Number(process.env.PASSWORD_SALT))
+            ? 10
+            : Number(process.env.PASSWORD_SALT),
     },
 };
