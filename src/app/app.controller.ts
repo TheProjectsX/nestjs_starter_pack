@@ -4,11 +4,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as mime from "mime-types";
 import { Response } from "express";
+import { ApiOperation } from "@nestjs/swagger";
 
 @Controller()
 export class AppController {
     @IsPublic()
     @Get()
+    @ApiOperation({ summary: "Test if Server is Running"})
     getHome() {
         return {
             success: true,
@@ -20,6 +22,7 @@ export class AppController {
 
     @IsPublic()
     @Get("files/:filename")
+    @ApiOperation({ summary: "Stream Files"})
     async streamFile(
         @Param("filename") filename: string,
         @Res() res: Response,

@@ -64,8 +64,8 @@ async function bootstrap() {
     const port = configService.get<number>("port") || 5000;
 
     const config = new DocumentBuilder()
-        .setTitle("backend_starter_pack")
-        .setDescription("The API Description for Backend Starter Pack")
+        .setTitle("NestJS Starter Pack")
+        .setDescription("The API Description for NestJS Backend Starter Pack")
         .setVersion("1.0")
         .build();
 
@@ -75,7 +75,6 @@ async function bootstrap() {
     fs.writeFileSync("./swagger-spec.json", JSON.stringify(document));
 
     await app.listen(port);
-    const url = await app.getUrl(); // default: http://[::1]:5000
 
     // Get local network IP
     const interfaces = os.networkInterfaces();
