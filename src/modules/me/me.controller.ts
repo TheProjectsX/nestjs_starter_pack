@@ -5,12 +5,12 @@ import {
     HttpStatus,
     Patch,
     Req,
-    UploadedFiles,
+    UploadedFile,
     UseInterceptors,
 } from "@nestjs/common";
 import { MeService } from "./me.service";
 import { ResponseService } from "@/utils/response";
-import { CustomFileFieldsInterceptor } from "@/helper/file_interceptor";
+import { CustomFileInterceptor } from "@/helper/files/file_interceptors";
 import { ParseFormDataInterceptor } from "@/helper/form_data_interceptor";
 import { UpdateProfileDto } from "./dto/updateProfile.dto";
 import { Request } from "express";
@@ -33,17 +33,14 @@ export class MeController {
     }
 
     @Patch("")
-    @UseInterceptors(
-        CustomFileFieldsInterceptor([{ name: "avatar", maxCount: 1 }]),
-        ParseFormDataInterceptor,
-    )
+    @UseInterceptors(CustomFileInterceptor("avatar"), ParseFormDataInterceptor)
     async updateProfile(
         @Body() payload: UpdateProfileDto,
         @Req() req: Request,
-        @UploadedFiles() files: Record<string, Express.Multer.File[]>,
+        @UploadedFile() file: Express.Multer.File,
     ) {
-        if (files?.avatar) {
-            payload.avatar = files.avatar[0].filename;
+        if (file) {
+            payload.avatar = file.filename;
         }
 
         const user = req.user as UserPayload;

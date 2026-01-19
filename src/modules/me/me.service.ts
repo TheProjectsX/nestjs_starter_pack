@@ -2,6 +2,7 @@ import { UserPayload } from "@/guards/auth.guard";
 import { PrismaService } from "@/helper/prisma.service";
 import { Injectable } from "@nestjs/common";
 import { UpdateProfileDto } from "./dto/updateProfile.dto";
+import { deleteFile } from "@/helper/files/delete_file";
 
 @Injectable()
 export class MeService {
@@ -50,6 +51,9 @@ export class MeService {
         });
 
         // Delete Avatar
+        if (profile.avatar) {
+            await deleteFile(profile.avatar);
+        }
 
         return {
             message: "Profile updated successfully",

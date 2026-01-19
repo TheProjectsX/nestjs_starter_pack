@@ -11,6 +11,7 @@ export default {
         frontend: process.env.FRONTEND_URL,
         backend: process.env.BACKEND_URL,
         uploads: process.env.BACKEND_UPLOADS_URL,
+        stream: process.env.BACKEND_STREAM_URL,
         reset_pass: process.env.RESET_PASS_URL,
     },
     stripe: {

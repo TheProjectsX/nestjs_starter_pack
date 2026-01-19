@@ -7,7 +7,7 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AppController } from "./app.controller";
-import { FileService } from "@/helper/file.service";
+import { FileService } from "@/helper/files/cloudinary.service";
 import { PrismaHelperService } from "@/utils/is_existance";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
