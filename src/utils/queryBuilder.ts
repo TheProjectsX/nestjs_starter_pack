@@ -82,7 +82,7 @@ class QueryBuilder<
         this.query = query;
     }
     /**
-     * Adds OR search conditions for specified fields using query.searchTerm.
+     * Adds OR search conditions for specified fields using query.search.
      *
      * Supports nested fields: `["name", "clinic.name"]`
      */
@@ -91,8 +91,8 @@ class QueryBuilder<
             ? WithString<T>
             : string[],
     ) {
-        const searchTerm = this.query.searchTerm as string;
-        if (!searchTerm) return this;
+        const search = this.query.search as string;
+        if (!search) return this;
 
         this.prismaQuery.where = {
             ...this.prismaQuery.where,
@@ -103,7 +103,7 @@ class QueryBuilder<
                         // last part = the actual field
                         return {
                             [key]: {
-                                contains: searchTerm,
+                                contains: search,
                                 mode: "insensitive",
                             },
                         };
@@ -126,11 +126,11 @@ class QueryBuilder<
         exactFields: (
             | EnumKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
             | (string & {})
-        )[],
+        )[] = [],
     ) {
         const queryObj = { ...this.query };
         const excludeFields = [
-            "searchTerm",
+            "search",
             "sort",
             "limit",
             "page",
@@ -357,11 +357,11 @@ class QueryBuilder<
     }
 
     /**
-     * Applies sorting from query.sort string.
+     * Applies sorting from query.order string.
      * Supports "-" prefix for descending order.
      */
     sort() {
-        const sort = (this.query.sort as string)?.split(",") || ["-createdAt"];
+        const sort = (this.query.order as string)?.split(",") || ["-createdAt"];
         const orderBy = sort.map((field) => {
             if (field.startsWith("-")) {
                 return { [field.slice(1)]: "desc" };
@@ -522,20 +522,20 @@ class QueryBuilder<
         page: number;
         limit: number;
         total: any;
-        totalPage: number;
+        totalPages: number;
     }> {
         const query = this.cleanQuery(this.prismaQuery);
 
         const total = await this.model.count({ where: query.where });
         const page = Number(this.query.page) || 1;
         const limit = Number(this.query.limit) || 10;
-        const totalPage = Math.ceil(total / limit);
+        const totalPages = Math.ceil(total / limit);
 
         return {
             page,
             limit,
             total,
-            totalPage,
+            totalPages,
         };
     }
 

@@ -25,7 +25,7 @@
         "generate:postman": "npx openapi-to-postmanv2 -s swagger-spec.json -o postman-collection.json -p",
         "update:postman": "node script/upload-to-postman.js",
         "sync:postman": "npm run generate:swagger && npm run generate:postman && npm run update:postman",
-        "check": "eslint src && npx prettier --write src"
+        "check": "eslint src && npx prettier --write src && npm run build && echo [✓] All checks passed!"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.803.0",

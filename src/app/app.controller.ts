@@ -10,7 +10,7 @@ import { ApiOperation } from "@nestjs/swagger";
 export class AppController {
     @IsPublic()
     @Get()
-    @ApiOperation({ summary: "Test if Server is Running"})
+    @ApiOperation({ summary: "Test if Server is Running" })
     getHome() {
         return {
             success: true,
@@ -22,7 +22,7 @@ export class AppController {
 
     @IsPublic()
     @Get("files/:filename")
-    @ApiOperation({ summary: "Stream Files"})
+    @ApiOperation({ summary: "Stream Files" })
     async streamFile(
         @Param("filename") filename: string,
         @Res() res: Response,

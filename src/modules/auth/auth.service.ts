@@ -14,6 +14,7 @@ import emailSender from "@/email/nodemailer";
 import { ChangePasswordDto } from "./dto/changePassword.dto";
 import { JwtPayload } from "@/interface/jwtPayload";
 import { ResetPasswordDto } from "./dto/resetPassword.dto";
+import { LoginUserDto } from "./dto/login.dto";
 
 @Injectable()
 export class AuthService {
@@ -24,11 +25,11 @@ export class AuthService {
     ) {}
 
     async register(payload: RegisterUserDto) {
-        const isUserExists = await this.prisma.user.findUnique({
-            where: { email: payload.email },
+        const userData = await this.prisma.user.findFirst({
+            where: { email: payload.email, verified: true },
         });
 
-        if (isUserExists) {
+        if (userData) {
             throw new ApiError(
                 HttpStatus.CONFLICT,
                 "User with this Email already exists!",
@@ -42,7 +43,18 @@ export class AuthService {
             config.password.salt,
         );
         const response = await this.prisma.user.create({
-            data: { ...payload, otp, otpExpiry, password: hashedPassword },
+            data: {
+                email: payload.email,
+                otp,
+                otpExpiry,
+                password: hashedPassword,
+                profile: {
+                    create: {
+                        name: payload.name,
+                        phone: payload.phone,
+                    },
+                },
+            },
             omit: { password: true },
         });
 
@@ -58,10 +70,11 @@ export class AuthService {
         };
     }
 
-    async loginWithEmail(payload: { email: string; password: string }) {
-        const userData = await this.prisma.user.findUniqueOrThrow({
+    async loginWithEmail(payload: LoginUserDto) {
+        const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
+                verified: true,
             },
         });
         if (!userData) {
@@ -69,15 +82,15 @@ export class AuthService {
         }
 
         if (!payload.password || !userData?.password) {
-            throw new Error("Password is required");
+            throw new ApiError(400, "Invalid Credentials");
         }
 
-        const isCorrectPassword = await this.bcryptService.compare(
+        const passwordMatched = await this.bcryptService.compare(
             payload.password,
             userData.password,
         );
 
-        if (!isCorrectPassword) {
+        if (!passwordMatched) {
             throw new ApiError(400, "Invalid Credentials");
         }
 
@@ -117,11 +130,11 @@ export class AuthService {
             role: userData.role,
         } satisfies JwtPayload;
 
-        const accessToken = this.jwtService.signAsync(jwtPayload, {
+        const accessToken = this.jwtService.sign(jwtPayload, {
             secret: config.jwt.jwt_secret,
             expiresIn: config.jwt.jwt_secret_expires_in,
         });
-        const refreshToken = this.jwtService.signAsync(jwtPayload, {
+        const refreshToken = this.jwtService.sign(jwtPayload, {
             secret: config.jwt.refresh_token_secret,
             expiresIn: config.jwt.refresh_token_expires_in,
         });
@@ -168,7 +181,9 @@ export class AuthService {
             html,
         });
 
-        return "OTP Resent Successfully!";
+        return {
+            message: "OTP Resent Successfully!",
+        };
     }
 
     async verifyOTP(payload: { otp: string; email: string }) {
@@ -201,6 +216,17 @@ export class AuthService {
             },
         });
 
+        // Delete other users with the same email but not verified
+        await this.prisma.user.deleteMany({
+            where: {
+                id: {
+                    not: userData.id,
+                },
+                email: userData.email,
+                verified: false,
+            },
+        });
+
         return {
             message: "OTP Verification successful",
         };
@@ -212,7 +238,7 @@ export class AuthService {
         }
 
         const userData = await this.prisma.user.findUnique({
-            where: { id: user?.id },
+            where: { id: user.id },
         });
 
         if (!userData) {
@@ -252,9 +278,10 @@ export class AuthService {
     }
 
     async forgotPassword(payload: { email: string }) {
-        const userData = await this.prisma.user.findUnique({
+        const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
+                verified: true,
             },
         });
         if (!userData) {
@@ -262,7 +289,7 @@ export class AuthService {
         }
 
         const jwtPayload = { email: userData.email, role: userData.role };
-        const resetPassToken = this.jwtService.signAsync(jwtPayload, {
+        const resetPassToken = this.jwtService.sign(jwtPayload, {
             secret: config.jwt.reset_token_secret,
             expiresIn: config.jwt.reset_token_expires_in,
         });
@@ -291,9 +318,9 @@ export class AuthService {
             );
         }
 
-        let decrypted;
+        let decrypted: JwtPayload | undefined;
         try {
-            decrypted = this.jwtService.verifyAsync(payload.refreshToken, {
+            decrypted = this.jwtService.verify(payload.refreshToken, {
                 secret: config.jwt.refresh_token_secret,
             });
         } catch {
@@ -320,7 +347,7 @@ export class AuthService {
             email: userData.email,
         };
 
-        const accessToken = this.jwtService.signAsync(jwtPayload, {
+        const accessToken = this.jwtService.sign(jwtPayload, {
             secret: config.jwt.jwt_secret,
             expiresIn: config.jwt.jwt_secret_expires_in,
         });
@@ -332,19 +359,20 @@ export class AuthService {
     }
 
     async resetPassword(payload: ResetPasswordDto) {
-        let decrypted;
+        let decrypted: JwtPayload | undefined;
 
         try {
-            decrypted = this.jwtService.verifyAsync(payload.token, {
+            decrypted = this.jwtService.verify(payload.token, {
                 secret: config.jwt.reset_token_secret,
             });
         } catch {
             throw new ApiError(HttpStatus.BAD_REQUEST, "Invalid Token");
         }
 
-        const userData = await this.prisma.user.findUnique({
+        const userData = await this.prisma.user.findFirst({
             where: {
                 email: decrypted.email,
+                verified: true,
             },
         });
 

@@ -18,7 +18,11 @@ export class ParseFormDataInterceptor implements NestInterceptor {
         if (request.body && request.body.data) {
             try {
                 const parsedData = JSON.parse(request.body.data); // Parse the 'data' field
-                request.body = { ...request.body, ...parsedData }; // Attach the parsed data to the body
+                request.body = {
+                    ...request.body,
+                    ...parsedData,
+                    data: undefined,
+                }; // Attach the parsed data to the body
             } catch {
                 throw new Error("Invalid JSON format in data field");
             }

@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { IGenericErrorMessage } from "src/error/error";
-import { IGenericErrorResponse } from "src/interface/common";
+import { IGenericErrorResponse } from "@/interface/common";
 // adjust path if needed
 
 export const handleClientError = (

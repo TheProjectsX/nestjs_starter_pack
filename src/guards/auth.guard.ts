@@ -9,12 +9,15 @@ import { Request } from "express";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "@/decorators/auth.decorator";
 import config from "@/config";
+import { PrismaService } from "@/helper/prisma.service";
+import { UserRole } from "@prisma/client";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
     constructor(
         private jwtService: JwtService,
         private reflector: Reflector,
+        private prisma: PrismaService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,7 +41,37 @@ export class AuthGuard implements CanActivate {
                 secret: config.jwt.jwt_secret,
             });
 
-            request["user"] = payload;
+            const user = await this.prisma.user.findUnique({
+                where: {
+                    id: payload.id,
+                },
+                select: {
+                    id: true,
+                    email: true,
+                    role: true,
+                    status: true,
+                    deleted: true,
+                    verified: true,
+                },
+            });
+
+            if (!user || user.deleted) {
+                throw new UnauthorizedException("Unauthorized Request");
+            }
+
+            if (!user.verified) {
+                throw new UnauthorizedException("User not verified");
+            }
+
+            if (user.status === "INACTIVE") {
+                throw new UnauthorizedException("User is inactive");
+            }
+
+            request["user"] = {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+            };
         } catch {
             throw new UnauthorizedException("Invalid token");
         }
@@ -50,3 +83,9 @@ export class AuthGuard implements CanActivate {
         return token;
     }
 }
+
+export type UserPayload = {
+    id: string;
+    email: string;
+    role: UserRole;
+};
