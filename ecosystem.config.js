@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'bajram-server',
+      name: 'nestjs_starter_pack',
       script: './dist/main.js',
       args: 'start',
       env: {
