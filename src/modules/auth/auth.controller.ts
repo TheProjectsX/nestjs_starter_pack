@@ -36,7 +36,6 @@ export class AuthController {
         });
     }
 
-    @HttpCode(HttpStatus.OK)
     @IsPublic()
     @Post("login")
     @ApiOperation({ summary: "Login User" })
@@ -50,7 +49,6 @@ export class AuthController {
         });
     }
 
-    @HttpCode(HttpStatus.OK)
     @IsPublic()
     @Post("resend-otp")
     @ApiOperation({ summary: "Resend OTP" })
@@ -64,7 +62,6 @@ export class AuthController {
         });
     }
 
-    @HttpCode(HttpStatus.OK)
     @IsPublic()
     @Post("verify-otp")
     @ApiOperation({ summary: "Verify OTP" })
