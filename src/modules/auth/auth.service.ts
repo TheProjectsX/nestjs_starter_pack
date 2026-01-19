@@ -10,7 +10,7 @@ import {
     generateForgetPasswordTemplate,
     generateVerifyOTPTemplate,
 } from "./auth.template";
-import emailSender from "@/email/nodemailer";
+import emailSender from "@/utils/email/nodemailer";
 import { ChangePasswordDto } from "./dto/changePassword.dto";
 import { JwtPayload } from "@/interface/jwtPayload";
 import { ResetPasswordDto } from "./dto/resetPassword.dto";

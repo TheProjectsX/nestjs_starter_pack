@@ -16,7 +16,7 @@ const emailSender = async ({
 }) => {
     const msg = {
         to: email,
-        from: config.sendGrid.email_from as string,
+        from: config.sendGrid.sender,
         subject: subject,
         html: html,
     };

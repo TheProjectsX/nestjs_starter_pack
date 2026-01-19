@@ -2,6 +2,18 @@ import nodemailer from "nodemailer";
 import config from "@/config";
 import { ApiError } from "@/utils/api_error";
 
+const transporter = nodemailer.createTransport({
+    // For Gmail
+    service: "gmail",
+    // For other service
+    // host: config.smtp.host,
+    // port: config.smtp.port,
+    auth: {
+        user: config.smtp.user,
+        pass: config.smtp.pass,
+    },
+});
+
 const emailSender = async ({
     email,
     subject,
@@ -11,20 +23,6 @@ const emailSender = async ({
     subject: string;
     html: string;
 }) => {
-    const transporter = nodemailer.createTransport({
-        // For Gmail
-        service: "gmail",
-        // For other service
-        // host: config.smtp.host,
-        // port: config.smtp.port,
-        auth: {
-            user: config.smtp.user,
-            pass: config.smtp.pass,
-        },
-    });
-
-    const emailTransport = transporter;
-
     const mailOptions = {
         from: `"${config.company_name}" <${config.smtp.sender}>`,
         to: email,
@@ -34,7 +32,7 @@ const emailSender = async ({
 
     // Send the email
     try {
-        const info = await emailTransport.sendMail(mailOptions);
+        const info = await transporter.sendMail(mailOptions);
         console.log("Email sent: " + info.response);
     } catch (error) {
         console.error("Error sending email:", error);

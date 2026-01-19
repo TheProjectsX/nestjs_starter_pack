@@ -10,7 +10,7 @@ const sendGridBulkEmailSender = async (
 ) => {
     const messages = emails.map(({ subject, email, html }) => ({
         to: email,
-        from: config.sendGrid.email_from as string,
+        from: config.sendGrid.sender as string,
         subject: subject,
         html: html,
     }));

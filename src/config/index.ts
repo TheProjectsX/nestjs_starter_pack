@@ -52,7 +52,15 @@ export default {
     },
     sendGrid: {
         api_key: process.env.SENDGRID_API_KEY,
-        email_from: process.env.SENDGRID_EMAIL,
+        sender: process.env.SENDGRID_EMAIL,
+    },
+    resend: {
+        api_key: process.env.RESEND_API_KEY,
+        sender: process.env.RESEND_EMAIL,
+    },
+    brevo: {
+        api_key: process.env.BREVO_API_KEY,
+        sender: process.env.BREVO_EMAIL,
     },
     aws: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,

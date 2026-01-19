@@ -13,7 +13,7 @@ import { Prisma } from "@prisma/client";
 import { TokenExpiredError } from "@nestjs/jwt";
 import { ValidationError } from "class-validator";
 import { ApiError } from "./api_error";
-import { IGenericErrorMessage } from "src/error/error";
+import { IGenericErrorMessage } from "@/interface/error";
 import { handleValidationError } from "./validation_error";
 import { handleClientError } from "./client_error";
 import { ConfigService } from "@nestjs/config";

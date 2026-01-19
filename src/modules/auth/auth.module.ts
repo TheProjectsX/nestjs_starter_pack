@@ -1,4 +1,3 @@
-import { BrevoService } from "@/email/brevo";
 import { PrismaService } from "@/helper/prisma.service";
 import { HttpModule } from "@nestjs/axios";
 import { Module } from "@nestjs/common";
@@ -16,13 +15,7 @@ import { AuthService } from "./auth.service";
         }),
         JwtModule.register({ global: true }),
     ],
-    providers: [
-        AuthService,
-        BcryptService,
-        PrismaService,
-        ConfigService,
-        BrevoService,
-    ],
+    providers: [AuthService, BcryptService, PrismaService, ConfigService],
     controllers: [AuthController],
     exports: [AuthService],
 })

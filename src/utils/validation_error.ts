@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { IGenericErrorMessage } from "src/error/error";
+import { IGenericErrorMessage } from "@/interface/error";
 import { IGenericErrorResponse } from "@/interface/common";
 // adjust the path if needed
 
