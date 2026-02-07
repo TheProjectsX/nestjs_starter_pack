@@ -28,6 +28,17 @@ type EnumKeys<T> = {
     [K in keyof T]: IsEnum<T[K]> extends true ? K : never;
 }[keyof T];
 
+// Helper to check if a type is boolean
+type IsBoolean<T> = T extends boolean
+    ? boolean extends T
+        ? false
+        : true
+    : false;
+
+type BooleanKeys<T> = {
+    [K in keyof T]: IsBoolean<T[K]> extends true ? K : never;
+}[keyof T];
+
 type DateKeys<T> = {
     [K in keyof T]: T[K] extends Date ? K : never;
 }[keyof T];
@@ -120,14 +131,24 @@ class QueryBuilder<
      * Applies filter conditions for query fields.
      * Supports "null", "notnull", exact fields, and contains search.
      *
-     * Also supports nested exactFields: `["role", "client.status"]`
+     * Can filter by nested exact fields e.g. ENUMs : `{ exacts: ["role", "client.status"] }`
+     * Can filter by nested boolean: `{ exacts: ["verified", "profile.deleted"] }`
      */
-    filter(
-        exactFields: (
+    filter({
+        exacts = [],
+        booleans = [],
+        exclude = [],
+    }: {
+        exacts?: (
             | EnumKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
             | (string & {})
-        )[] = [],
-    ) {
+        )[];
+        booleans?: (
+            | BooleanKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
+            | (string & {})
+        )[];
+        exclude?: string[];
+    } = {}) {
         const queryObj = { ...this.query };
         const excludeFields = [
             "search",
@@ -137,6 +158,7 @@ class QueryBuilder<
             "fields",
             "populate",
             "dateRange",
+            ...exclude,
         ];
         excludeFields.forEach((field) => delete queryObj[field]);
 
@@ -147,12 +169,24 @@ class QueryBuilder<
                 formattedFilters[field] = null;
             } else if (value === "notnull") {
                 formattedFilters[field] = { not: null };
-            } else if ((exactFields as string[]).includes(field)) {
+            } else if ((exacts as string[]).includes(field)) {
                 const parts = field.split(".");
                 const nestedFilter = parts.reduceRight<any>(
                     (acc, key, index) => {
                         if (index === parts.length - 1) {
                             return { [key]: { equals: value } };
+                        }
+                        return { [key]: acc };
+                    },
+                    {},
+                );
+                Object.assign(formattedFilters, nestedFilter);
+            } else if ((booleans as string[]).includes(field)) {
+                const parts = field.split(".");
+                const nestedFilter = parts.reduceRight<any>(
+                    (acc, key, index) => {
+                        if (index === parts.length - 1) {
+                            return { [key]: value === "false" ? false : true };
                         }
                         return { [key]: acc };
                     },
@@ -522,20 +556,20 @@ class QueryBuilder<
         page: number;
         limit: number;
         total: any;
-        totalPages: number;
+        totalPage: number;
     }> {
         const query = this.cleanQuery(this.prismaQuery);
 
         const total = await this.model.count({ where: query.where });
         const page = Number(this.query.page) || 1;
         const limit = Number(this.query.limit) || 10;
-        const totalPages = Math.ceil(total / limit);
+        const totalPage = Math.ceil(total / limit);
 
         return {
             page,
             limit,
             total,
-            totalPages,
+            totalPage,
         };
     }
 
