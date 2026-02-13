@@ -70,7 +70,17 @@ async function bootstrap() {
         .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup("api", app, document);
+
+    // Remove the auto generate "Response" from requests
+    for (const path of Object.values(document.paths)) {
+        for (const method of Object.values(path)) {
+            if (!method.responses) continue;
+
+            method.responses = {};
+        }
+    }
+
+    SwaggerModule.setup("api/api", app, document);
 
     fs.writeFileSync("./swagger-spec.json", JSON.stringify(document));
 
