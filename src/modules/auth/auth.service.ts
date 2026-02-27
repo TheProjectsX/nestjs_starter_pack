@@ -3,18 +3,22 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ApiError } from "src/utils/api_error";
 import { BcryptService } from "src/utils/bcrypt.service";
-import { RegisterUserDto } from "./dto/register.dto";
 import { generateOTP } from "./auth.utils";
 import config from "@/config";
 import {
     generateForgetPasswordTemplate,
+    generateForgotPasswordOTPTemplate,
     generateVerifyOTPTemplate,
 } from "./auth.template";
 import emailSender from "@/utils/email/nodemailer";
-import { ChangePasswordDto } from "./dto/changePassword.dto";
 import { JwtPayload } from "@/interface/jwtPayload";
-import { ResetPasswordDto } from "./dto/resetPassword.dto";
-import { LoginUserDto } from "./dto/login.dto";
+import {
+    ChangePasswordDto,
+    LoginUserDto,
+    RegisterUserDto,
+    ResetPasswordDto,
+    VerifyOtpDto,
+} from "./dto/body.dto";
 
 @Injectable()
 export class AuthService {
@@ -148,7 +152,7 @@ export class AuthService {
         };
     }
 
-    async resendOTP(payload: { email: string }) {
+    async sendOTP(payload: { email: string }) {
         const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
@@ -186,7 +190,7 @@ export class AuthService {
         };
     }
 
-    async verifyOTP(payload: { otp: string; email: string }) {
+    async verifyOTP(payload: VerifyOtpDto) {
         const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
@@ -229,6 +233,70 @@ export class AuthService {
 
         return {
             message: "OTP Verification successful",
+        };
+    }
+
+    async sendForgotPasswordOtp(payload: { email: string }) {
+        const userData = await this.prisma.user.findFirst({
+            where: {
+                email: payload.email,
+            },
+        });
+
+        if (!userData) {
+            throw new ApiError(404, "User not found");
+        }
+
+        const { otp, otpExpiry } = generateOTP();
+
+        await this.prisma.user.update({
+            where: {
+                id: userData.id,
+            },
+            data: { otp, otpExpiry },
+        });
+
+        const html = generateForgotPasswordOTPTemplate(otp);
+        await emailSender({
+            email: userData.email,
+            subject: `Password Reset OTP - ${config.company_name}`,
+            html: html,
+        });
+
+        return {
+            message: "Password Reset OTP Sent Successfully!",
+        };
+    }
+
+    async verifyForgotPasswordOTP(payload: VerifyOtpDto) {
+        const userData = await this.prisma.user.findFirst({
+            where: {
+                email: payload.email,
+            },
+        });
+
+        if (!userData) {
+            throw new ApiError(404, "User not found");
+        }
+
+        if (userData.otp !== payload.otp) {
+            throw new ApiError(404, "Incorrect OTP");
+        }
+
+        if (userData.otpExpiry && userData.otpExpiry < new Date()) {
+            throw new ApiError(400, "OTP expired");
+        }
+
+        const jwtPayload = { email: userData.email, otp: userData.otp };
+
+        const resetPassToken = this.jwtService.sign(jwtPayload, {
+            secret: config.jwt.reset_token_secret,
+            expiresIn: config.jwt.reset_token_expires_in,
+        });
+
+        return {
+            message: "OTP Verification successful",
+            data: { token: resetPassToken },
         };
     }
 

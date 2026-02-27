@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import * as nodemailer from "nodemailer";
 import config from "@/config";
 import { ApiError } from "@/utils/api_error";
 
@@ -18,16 +18,19 @@ const emailSender = async ({
     email,
     subject,
     html,
+    text,
 }: {
     email: string;
     subject: string;
     html: string;
+    text?: string;
 }) => {
     const mailOptions = {
         from: `"${config.company_name}" <${config.smtp.sender}>`,
         to: email,
         subject,
         html,
+        ...(text && { text }),
     };
 
     // Send the email

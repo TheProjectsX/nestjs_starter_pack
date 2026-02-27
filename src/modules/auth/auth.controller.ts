@@ -7,15 +7,18 @@ import {
     Req,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
-import { LoginUserDto } from "./dto/login.dto";
 import { IsPublic } from "@/decorators/auth.decorator";
 import { Request } from "express";
 import { ResponseService } from "@/utils/response";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { RegisterUserDto } from "./dto/register.dto";
-import { ChangePasswordDto } from "./dto/changePassword.dto";
-import { ResetPasswordDto } from "./dto/resetPassword.dto";
 import { JwtPayload } from "@/interface/jwtPayload";
+import {
+    ChangePasswordDto,
+    LoginUserDto,
+    RegisterUserDto,
+    ResetPasswordDto,
+    VerifyOtpDto,
+} from "./dto/body.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -50,10 +53,10 @@ export class AuthController {
     }
 
     @IsPublic()
-    @Post("resend-otp")
+    @Post("send-otp")
     @ApiOperation({ summary: "Resend OTP" })
     async resendOTP(@Body() payload: { email: string }) {
-        const result = await this.authService.resendOTP(payload);
+        const result = await this.authService.sendOTP(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
@@ -65,13 +68,40 @@ export class AuthController {
     @IsPublic()
     @Post("verify-otp")
     @ApiOperation({ summary: "Verify OTP" })
-    async verifyOTP(@Body() payload: { otp: string; email: string }) {
+    async verifyOTP(@Body() payload: VerifyOtpDto) {
         const result = await this.authService.verifyOTP(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "OTP Verification successful",
             data: result,
+        });
+    }
+
+    @IsPublic()
+    @Post("send-otp/password-reset")
+    @ApiOperation({ summary: "Send Forgot Password OTP" })
+    async sendForgotPasswordOtp(@Body() payload: { email: string }) {
+        await this.authService.sendForgotPasswordOtp(payload);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "Password Reset OTP Sent Successfully!",
+        });
+    }
+
+    @IsPublic()
+    @Post("verify-otp/password-reset")
+    @ApiOperation({ summary: "Verify Forgot Password OTP" })
+    async verifyForgotPasswordOTP(
+        @Body() payload: { otp: string; email: string },
+    ) {
+        const result = await this.authService.verifyForgotPasswordOTP(payload);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "OTP Verification successful",
+            data: result.data,
         });
     }
 
