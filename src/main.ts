@@ -1,13 +1,11 @@
 import { ConsoleLogger, ValidationPipe } from "@nestjs/common";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import * as cookieParser from "cookie-parser";
-import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "@/app/app.module";
 import type { Request, Response } from "express";
-import * as fs from "fs";
 import * as express from "express";
 import * as os from "os";
+import config from "./config";
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -20,8 +18,14 @@ async function bootstrap() {
         rawBody: true,
     });
 
+    // --- Middlewares & Config ---
+    app.use(cookieParser());
+    app.use("/api/v1/webhook", express.raw({ type: "application/json" }));
+    app.setGlobalPrefix("api/v1");
+
+    // --- CORS ---
     app.enableCors({
-        origin: [],
+        origin: [], // Set specific origins in prod
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: [
@@ -31,7 +35,7 @@ async function bootstrap() {
         ],
     });
 
-    // To check the server status
+    // --- Health Check ---
     const nativeApp = app.getHttpAdapter().getInstance();
     nativeApp.get("/", (req: Request, res: Response) => {
         res.send({
@@ -42,11 +46,7 @@ async function bootstrap() {
         });
     });
 
-    app.use("/api/v1/webhook", express.raw({ type: "application/json" }));
-
-    app.setGlobalPrefix("api/v1");
-
-    // validation pipe
+    // --- Global Pipes ---
     app.useGlobalPipes(
         new ValidationPipe({
             disableErrorMessages: false,
@@ -57,39 +57,13 @@ async function bootstrap() {
         }),
     );
 
-    app.use(cookieParser());
-
-    const configService = app.get(ConfigService);
-
-    const port = configService.get<number>("port") || 5000;
-
-    const config = new DocumentBuilder()
-        .setTitle("NestJS Starter Pack")
-        .setDescription("The API Description for NestJS Backend Starter Pack")
-        .setVersion("1.0")
-        .build();
-
-    const document = SwaggerModule.createDocument(app, config);
-
-    // Remove the auto generate "Response" from requests
-    for (const path of Object.values(document.paths)) {
-        for (const method of Object.values(path)) {
-            if (!method.responses) continue;
-
-            method.responses = {};
-        }
-    }
-
-    SwaggerModule.setup("api/api", app, document);
-
-    fs.writeFileSync("./swagger-spec.json", JSON.stringify(document));
-
+    // --- Server Listen ---
+    const port = config.port || 5000;
     await app.listen(port);
 
-    // Get local network IP
+    // --- Startup Feedback ---
     const interfaces = os.networkInterfaces();
     let localIP = "127.0.0.1";
-
     for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]!) {
             if (iface.family === "IPv4" && !iface.internal) {
@@ -98,9 +72,10 @@ async function bootstrap() {
         }
     }
 
-    console.log(`\nApplication is running on:`);
-    console.log(`  localhost: http://localhost:${port}`);
-    console.log(`  network:   http://${localIP}:${port}`);
+    console.log(`\n🚀 Application is running on:`);
+    console.log(`📡 Local:    http://localhost:${port}`);
+    console.log(`🌐 Network:  http://${localIP}:${port}`);
+    console.log(`📚 Swagger:  http://localhost:${port}/api/v1`);
 }
 
 bootstrap();

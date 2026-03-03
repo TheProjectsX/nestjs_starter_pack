@@ -13,6 +13,8 @@ export default {
         uploads: process.env.BACKEND_UPLOADS_URL,
         stream: process.env.BACKEND_STREAM_URL,
         reset_pass: process.env.RESET_PASS_URL,
+        payment_success: process.env.PAYMENT_SUCCESS_URL,
+        payment_failed: process.env.PAYMENT_FAILED_URL,
     },
     stripe: {
         secret_key: process.env.STRIPE_SECRET_KEY,

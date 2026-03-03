@@ -7,11 +7,10 @@ import {
     Req,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
-import { IsPublic } from "@/decorators/auth.decorator";
+import { IsPublic } from "@/common/decorators/auth.decorator";
 import { Request } from "express";
-import { ResponseService } from "@/utils/response";
+import { ResponseService } from "@/common/interceptors/response";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { JwtPayload } from "@/interface/jwtPayload";
 import {
     ChangePasswordDto,
     LoginUserDto,
@@ -19,6 +18,7 @@ import {
     ResetPasswordDto,
     VerifyOtpDto,
 } from "./dto/body.dto";
+import { UserPayload } from "@/common/guards/auth.guard";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -113,7 +113,7 @@ export class AuthController {
     ) {
         const result = await this.authService.changePassword(
             payload,
-            req.user as JwtPayload,
+            req.user as UserPayload,
         );
 
         return ResponseService.formatResponse({

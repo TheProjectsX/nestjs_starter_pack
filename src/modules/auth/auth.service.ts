@@ -1,8 +1,8 @@
-import { PrismaService } from "@/helper/prisma.service";
+import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { ApiError } from "src/utils/api_error";
-import { BcryptService } from "src/utils/bcrypt.service";
+import { ApiError } from "@/common/errors/api_error";
+import { BcryptService } from "@/common/utils/bcrypt.service";
 import { generateOTP } from "./auth.utils";
 import config from "@/config";
 import {
@@ -10,8 +10,6 @@ import {
     generateForgotPasswordOTPTemplate,
     generateVerifyOTPTemplate,
 } from "./auth.template";
-import emailSender from "@/utils/email/nodemailer";
-import { JwtPayload } from "@/interface/jwtPayload";
 import {
     ChangePasswordDto,
     LoginUserDto,
@@ -19,6 +17,8 @@ import {
     ResetPasswordDto,
     VerifyOtpDto,
 } from "./dto/body.dto";
+import { UserPayload } from "@/common/guards/auth.guard";
+import { sendEmail } from "@/core/services/email";
 
 @Injectable()
 export class AuthService {
@@ -63,7 +63,7 @@ export class AuthService {
         });
 
         const html = generateVerifyOTPTemplate(otp);
-        await emailSender({
+        await sendEmail({
             email: response.email,
             subject: `Account Verification Code - ${config.company_name}`,
             html,
@@ -116,7 +116,7 @@ export class AuthService {
             });
 
             const html = generateVerifyOTPTemplate(otp);
-            await emailSender({
+            await sendEmail({
                 email: userData.email,
                 subject: `Account Verification Code - ${config.company_name}`,
                 html,
@@ -132,7 +132,7 @@ export class AuthService {
             id: userData.id,
             email: userData.email,
             role: userData.role,
-        } satisfies JwtPayload;
+        } satisfies UserPayload;
 
         const accessToken = this.jwtService.sign(jwtPayload, {
             secret: config.jwt.jwt_secret,
@@ -179,7 +179,7 @@ export class AuthService {
         });
 
         const html = generateVerifyOTPTemplate(otp);
-        await emailSender({
+        await sendEmail({
             email: userData.email,
             subject: `Account Verification Code - ${config.company_name}`,
             html,
@@ -257,7 +257,7 @@ export class AuthService {
         });
 
         const html = generateForgotPasswordOTPTemplate(otp);
-        await emailSender({
+        await sendEmail({
             email: userData.email,
             subject: `Password Reset OTP - ${config.company_name}`,
             html: html,
@@ -300,7 +300,7 @@ export class AuthService {
         };
     }
 
-    async changePassword(payload: ChangePasswordDto, user: JwtPayload) {
+    async changePassword(payload: ChangePasswordDto, user: UserPayload) {
         if (!payload.oldPassword || !payload.newPassword) {
             throw new ApiError(HttpStatus.BAD_REQUEST, "Invalid Body Provided");
         }
@@ -367,7 +367,7 @@ export class AuthService {
             `?userId=${userData.id}&token=${resetPassToken}`;
 
         const html = generateForgetPasswordTemplate(resetPassLink);
-        await emailSender({
+        await sendEmail({
             email: userData.email,
             subject: `Password Reset Request - ${config.company_name}`,
             html,
@@ -386,7 +386,7 @@ export class AuthService {
             );
         }
 
-        let decrypted: JwtPayload | undefined;
+        let decrypted: UserPayload | undefined;
         try {
             decrypted = this.jwtService.verify(payload.refreshToken, {
                 secret: config.jwt.refresh_token_secret,
@@ -427,7 +427,7 @@ export class AuthService {
     }
 
     async resetPassword(payload: ResetPasswordDto) {
-        let decrypted: JwtPayload | undefined;
+        let decrypted: UserPayload | undefined;
 
         try {
             decrypted = this.jwtService.verify(payload.token, {

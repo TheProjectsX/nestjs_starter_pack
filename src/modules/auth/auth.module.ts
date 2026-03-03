@@ -1,9 +1,6 @@
-import { PrismaService } from "@/helper/prisma.service";
 import { HttpModule } from "@nestjs/axios";
 import { Module } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
-import { BcryptService } from "src/utils/bcrypt.service";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 
@@ -15,7 +12,7 @@ import { AuthService } from "./auth.service";
         }),
         JwtModule.register({ global: true }),
     ],
-    providers: [AuthService, BcryptService, PrismaService, ConfigService],
+    providers: [AuthService],
     controllers: [AuthController],
     exports: [AuthService],
 })
