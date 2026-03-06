@@ -21,7 +21,6 @@
         "check": "eslint src && npx prettier --write src && npm run build && echo [✓] All checks passed!"
     },
     "dependencies": {
-        "@aws-sdk/client-s3": "^3.803.0",
         "@nestjs/axios": "^4.0.1",
         "@nestjs/common": "^11.1.14",
         "@nestjs/config": "^4.0.2",
@@ -86,6 +85,6 @@
     "overrides": {
         "fast-xml-parser": "5.3.8",
         "serialize-javascript": "7.0.4",
-        "multer": "2.1.0"
+        "multer": "2.1.1"
     }
 }

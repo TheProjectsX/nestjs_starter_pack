@@ -4,8 +4,10 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "@/app/app.module";
 import type { Request, Response } from "express";
 import * as express from "express";
-import * as os from "os";
 import config from "./config";
+
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { getLocalIP } from "./common/utils/localIp";
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -25,7 +27,7 @@ async function bootstrap() {
 
     // --- CORS ---
     app.enableCors({
-        origin: [], // Set specific origins in prod
+        origin: ["http://localhost:3000"], // Set specific origins in prod
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: [
@@ -57,25 +59,29 @@ async function bootstrap() {
         }),
     );
 
+    // --- Swagger Doc - Dev server only ---
+    if (config.env !== "production") {
+        const swaggerConfig = new DocumentBuilder()
+            .setTitle("NestJS Starter Pack")
+            .setDescription(
+                "The API Description for NestJS Backend Starter Pack",
+            )
+            .setVersion("1.0")
+            .build();
+
+        const document = SwaggerModule.createDocument(app, swaggerConfig);
+        SwaggerModule.setup("api/v1", app, document);
+    }
+
     // --- Server Listen ---
     const port = config.port || 5000;
     await app.listen(port);
 
-    // --- Startup Feedback ---
-    const interfaces = os.networkInterfaces();
-    let localIP = "127.0.0.1";
-    for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]!) {
-            if (iface.family === "IPv4" && !iface.internal) {
-                localIP = iface.address;
-            }
-        }
-    }
-
     console.log(`\n🚀 Application is running on:`);
     console.log(`📡 Local:    http://localhost:${port}`);
-    console.log(`🌐 Network:  http://${localIP}:${port}`);
-    console.log(`📚 Swagger:  http://localhost:${port}/api/v1`);
+    console.log(`🌐 Network:  http://${getLocalIP()}:${port}`);
+    if (config.env !== "production")
+        console.log(`📚 Swagger:  http://localhost:${port}/api/v1`);
 }
 
 bootstrap();
