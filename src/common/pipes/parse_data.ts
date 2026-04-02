@@ -55,7 +55,7 @@ export class ParseDataPipe implements PipeTransform {
         } catch (error) {
             throw new BadRequestException({
                 success: false,
-                message: error.message || "Invalid data format or structure",
+                message: (error as Error).message || "Invalid data format or structure",
                 errorMessages: [],
             });
         }

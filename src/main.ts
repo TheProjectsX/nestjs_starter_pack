@@ -1,5 +1,6 @@
+import "tsconfig-paths/register";
 import { ConsoleLogger, ValidationPipe } from "@nestjs/common";
-import * as cookieParser from "cookie-parser";
+import cookieParser from "cookie-parser";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "@/app/app.module";
 import type { Request, Response } from "express";
@@ -21,7 +22,7 @@ async function bootstrap() {
     });
 
     // --- Middlewares & Config ---
-    app.use(cookieParser());
+    app.use(cookieParser() as any);
     app.use("/api/v1/webhook", express.raw({ type: "application/json" }));
     app.setGlobalPrefix("api/v1");
 
@@ -95,7 +96,7 @@ async function bootstrap() {
     if (config.env !== "production")
         console.log(`📚 Swagger:  http://localhost:${port}/api/v1`);
 
-    return app
+    return app;
 }
 
-export default bootstrap();
+bootstrap();
