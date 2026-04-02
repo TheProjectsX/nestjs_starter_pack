@@ -39,9 +39,37 @@ export class ChangePasswordDto {
 }
 
 export class VerifyOtpDto {
-    @IsNumber()
+    @IsString()
     otp: string;
 
     @IsEmail()
     email: string;
+}
+
+export class ResendOtpDto {
+    @IsEmail()
+    email: string;
+}
+
+export class SendForgotPasswordOtpDto {
+    @IsEmail()
+    email: string;
+}
+
+export class VerifyForgotPasswordOtpDto {
+    @IsString()
+    otp: string;
+
+    @IsEmail()
+    email: string;
+}
+
+export class ForgotPasswordDto {
+    @IsEmail()
+    email: string;
+}
+
+export class RefreshTokenDto {
+    @IsString()
+    refreshToken: string;
 }

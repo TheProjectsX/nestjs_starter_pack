@@ -13,9 +13,14 @@ import { ResponseService } from "@/common/interceptors/response";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
     ChangePasswordDto,
+    ForgotPasswordDto,
     LoginUserDto,
+    RefreshTokenDto,
     RegisterUserDto,
+    ResendOtpDto,
     ResetPasswordDto,
+    SendForgotPasswordOtpDto,
+    VerifyForgotPasswordOtpDto,
     VerifyOtpDto,
 } from "./dto/body.dto";
 import { UserPayload } from "@/common/guards/auth.guard";
@@ -30,12 +35,11 @@ export class AuthController {
     @Post("register")
     @ApiOperation({ summary: "Register User" })
     async register(@Body() payload: RegisterUserDto) {
-        const result = await this.authService.register(payload);
+        await this.authService.register(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "OTP Sent to your Email",
-            data: result,
         });
     }
 
@@ -48,20 +52,19 @@ export class AuthController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "User Login successful",
-            data: result,
+            data: result.data,
         });
     }
 
     @IsPublic()
     @Post("send-otp")
     @ApiOperation({ summary: "Resend OTP" })
-    async resendOTP(@Body() payload: { email: string }) {
-        const result = await this.authService.sendOTP(payload);
+    async resendOTP(@Body() payload: ResendOtpDto) {
+        await this.authService.sendOTP(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "OTP Resent Successfully!",
-            data: result,
         });
     }
 
@@ -69,19 +72,18 @@ export class AuthController {
     @Post("verify-otp")
     @ApiOperation({ summary: "Verify OTP" })
     async verifyOTP(@Body() payload: VerifyOtpDto) {
-        const result = await this.authService.verifyOTP(payload);
+        await this.authService.verifyOTP(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "OTP Verification successful",
-            data: result,
         });
     }
 
     @IsPublic()
     @Post("send-otp/password-reset")
     @ApiOperation({ summary: "Send Forgot Password OTP" })
-    async sendForgotPasswordOtp(@Body() payload: { email: string }) {
+    async sendForgotPasswordOtp(@Body() payload: SendForgotPasswordOtpDto) {
         await this.authService.sendForgotPasswordOtp(payload);
 
         return ResponseService.formatResponse({
@@ -93,9 +95,7 @@ export class AuthController {
     @IsPublic()
     @Post("verify-otp/password-reset")
     @ApiOperation({ summary: "Verify Forgot Password OTP" })
-    async verifyForgotPasswordOTP(
-        @Body() payload: { otp: string; email: string },
-    ) {
+    async verifyForgotPasswordOTP(@Body() payload: VerifyForgotPasswordOtpDto) {
         const result = await this.authService.verifyForgotPasswordOTP(payload);
 
         return ResponseService.formatResponse({
@@ -111,28 +111,23 @@ export class AuthController {
         @Body() payload: ChangePasswordDto,
         @Req() req: Request,
     ) {
-        const result = await this.authService.changePassword(
-            payload,
-            req.user as UserPayload,
-        );
+        await this.authService.changePassword(payload, req.user as UserPayload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "Password Changed successfully",
-            data: result,
         });
     }
 
     @IsPublic()
     @Post("forgot-password")
     @ApiOperation({ summary: "Forgot Password" })
-    async forgotPassword(@Body() payload: { email: string }) {
-        const result = await this.authService.forgotPassword(payload);
+    async forgotPassword(@Body() payload: ForgotPasswordDto) {
+        await this.authService.forgotPassword(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "Password Reset Instructions sent to Email",
-            data: result,
         });
     }
 
@@ -140,12 +135,11 @@ export class AuthController {
     @Post("reset-password")
     @ApiOperation({ summary: "Reset Password" })
     async resetPassword(@Body() payload: ResetPasswordDto) {
-        const result = await this.authService.resetPassword(payload);
+        await this.authService.resetPassword(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "Password Reset successful",
-            data: result,
         });
     }
 
@@ -153,13 +147,13 @@ export class AuthController {
     @IsPublic()
     @Post("refresh-token")
     @ApiOperation({ summary: "Refresh Access Token" })
-    async refreshToken(@Body() payload: { refreshToken: string }) {
+    async refreshToken(@Body() payload: RefreshTokenDto) {
         const result = await this.authService.refreshToken(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "Access Token generated",
-            data: result,
+            data: result.data,
         });
     }
 }

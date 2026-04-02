@@ -12,9 +12,14 @@ import {
 } from "./auth.template";
 import {
     ChangePasswordDto,
+    ForgotPasswordDto,
     LoginUserDto,
+    RefreshTokenDto,
     RegisterUserDto,
+    ResendOtpDto,
     ResetPasswordDto,
+    SendForgotPasswordOtpDto,
+    VerifyForgotPasswordOtpDto,
     VerifyOtpDto,
 } from "./dto/body.dto";
 import { UserPayload } from "@/common/guards/auth.guard";
@@ -82,11 +87,11 @@ export class AuthService {
             },
         });
         if (!userData) {
-            throw new ApiError(400, "Invalid Credentials");
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
         }
 
         if (!payload.password || !userData?.password) {
-            throw new ApiError(400, "Invalid Credentials");
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
         }
 
         const passwordMatched = await this.bcryptService.compare(
@@ -95,7 +100,7 @@ export class AuthService {
         );
 
         if (!passwordMatched) {
-            throw new ApiError(400, "Invalid Credentials");
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
         }
 
         if (userData.status === "INACTIVE")
@@ -103,7 +108,7 @@ export class AuthService {
                 HttpStatus.FORBIDDEN,
                 "This account is Inactive",
             );
-        if (userData.deleted) throw new ApiError(400, "Invalid Credentials");
+        if (userData.deleted) throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
 
         if (!userData?.verified) {
             const { otp, otpExpiry } = generateOTP();
@@ -152,7 +157,7 @@ export class AuthService {
         };
     }
 
-    async sendOTP(payload: { email: string }) {
+    async sendOTP(payload: ResendOtpDto) {
         const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
@@ -236,7 +241,7 @@ export class AuthService {
         };
     }
 
-    async sendForgotPasswordOtp(payload: { email: string }) {
+    async sendForgotPasswordOtp(payload: SendForgotPasswordOtpDto) {
         const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
@@ -268,7 +273,7 @@ export class AuthService {
         };
     }
 
-    async verifyForgotPasswordOTP(payload: VerifyOtpDto) {
+    async verifyForgotPasswordOTP(payload: VerifyForgotPasswordOtpDto) {
         const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
@@ -345,7 +350,7 @@ export class AuthService {
         return { message: "Password Changed successfully" };
     }
 
-    async forgotPassword(payload: { email: string }) {
+    async forgotPassword(payload: ForgotPasswordDto) {
         const userData = await this.prisma.user.findFirst({
             where: {
                 email: payload.email,
@@ -378,7 +383,7 @@ export class AuthService {
         };
     }
 
-    async refreshToken(payload: { refreshToken: string }) {
+    async refreshToken(payload: RefreshTokenDto) {
         if (!payload.refreshToken) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,

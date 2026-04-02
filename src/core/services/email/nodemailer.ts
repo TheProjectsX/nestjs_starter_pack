@@ -39,7 +39,7 @@ const nodemailEmailSender = async ({
         console.log("Email sent: " + info.response);
     } catch (error) {
         console.error("Error sending email:", error);
-        throw new ApiError(500, "Error sending email");
+        // throw new ApiError(500, "Error sending email");
     }
 };
 

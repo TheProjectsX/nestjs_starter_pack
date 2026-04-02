@@ -10,9 +10,21 @@ async function generateSwagger() {
         .setTitle("NestJS Starter Pack")
         .setDescription("The API Description for NestJS Backend Starter Pack")
         .setVersion("1.0")
+        .addBearerAuth(
+            {
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "JWT",
+                name: "Authorization",
+                description: "Enter JWT token",
+                in: "header",
+            },
+            "accessToken",
+        )
         .build();
 
     const document = SwaggerModule.createDocument(app, config);
+    document.security = [{ accessToken: [] }];
 
     // Remove the auto generate "Response" from requests
     for (const path of Object.values(document.paths)) {
@@ -23,7 +35,7 @@ async function generateSwagger() {
         }
     }
 
-    fs.writeFileSync("../swagger-spec.json", JSON.stringify(document, null, 2));
+    fs.writeFileSync("./swagger-spec.json", JSON.stringify(document, null, 2));
 
     await app.close();
 }

@@ -67,9 +67,21 @@ async function bootstrap() {
                 "The API Description for NestJS Backend Starter Pack",
             )
             .setVersion("1.0")
+            .addBearerAuth(
+                {
+                    type: "http",
+                    scheme: "bearer",
+                    bearerFormat: "JWT",
+                    name: "Authorization",
+                    description: "Enter JWT token",
+                    in: "header",
+                },
+                "accessToken",
+            )
             .build();
 
         const document = SwaggerModule.createDocument(app, swaggerConfig);
+        document.security = [{ accessToken: [] }];
         SwaggerModule.setup("api/v1", app, document);
     }
 
@@ -82,6 +94,8 @@ async function bootstrap() {
     console.log(`🌐 Network:  http://${getLocalIP()}:${port}`);
     if (config.env !== "production")
         console.log(`📚 Swagger:  http://localhost:${port}/api/v1`);
+
+    return app
 }
 
-bootstrap();
+export default bootstrap();
