@@ -1,7 +1,7 @@
 import { UserPayload } from "@/common/guards/auth.guard";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { Injectable } from "@nestjs/common";
-import { UpdateProfileDto } from "./dto/updateProfile.dto";
+import { UpdateProfileDto } from "./dto/body";
 import { deleteFile } from "@/core/services/files/delete_file";
 
 @Injectable()

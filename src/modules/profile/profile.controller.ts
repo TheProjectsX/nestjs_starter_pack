@@ -12,7 +12,7 @@ import { ProfileService } from "./profile.service";
 import { ResponseService } from "@/common/interceptors/response";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
-import { UpdateProfileDto } from "./dto/updateProfile.dto";
+import { UpdateProfileDto } from "./dto/body";
 import { Request } from "express";
 import { UserPayload } from "@/common/guards/auth.guard";
 import { ApiOperation } from "@nestjs/swagger";
