@@ -35,18 +35,19 @@ export class AuthController {
     @Post("register")
     @ApiOperation({ summary: "Register User" })
     async register(@Body() payload: RegisterUserDto) {
-        await this.authService.register(payload);
+        const result = await this.authService.register(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: "OTP Sent to your Email",
+            data: result.data,
         });
     }
 
     @IsPublic()
     @Post("login")
     @ApiOperation({ summary: "Login User" })
-    async signIn(@Body() payload: LoginUserDto) {
+    async loginWithEmail(@Body() payload: LoginUserDto) {
         const result = await this.authService.loginWithEmail(payload);
 
         return ResponseService.formatResponse({

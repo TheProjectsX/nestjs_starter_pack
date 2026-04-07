@@ -22,7 +22,7 @@ async function bootstrap() {
     });
 
     // --- Middlewares & Config ---
-    app.use(cookieParser() as any);
+    app.use(cookieParser());
     app.use("/api/v1/webhook", express.raw({ type: "application/json" }));
     app.setGlobalPrefix("api/v1");
 

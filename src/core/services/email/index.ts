@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import nodemailEmailSender from "./nodemailer";
 
 export interface EmailOptions {
@@ -9,10 +11,10 @@ export interface EmailOptions {
 
 export const sendEmail = async ({ email, subject, html }: EmailOptions) => {
     try {
-        
-        return nodemailEmailSender({ email, subject, html });
+        return;
+        // return nodemailEmailSender({ email, subject, html });
     } catch (error) {
-        console.log("Email Send Failed: ", (error as Error).message)
+        console.log("Email Send Failed: ", (error as Error).message);
     }
 
     // Implementation for sending email (e.g., using Nodemailer, AWS SES, or SendGrid)

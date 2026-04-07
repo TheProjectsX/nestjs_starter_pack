@@ -76,6 +76,7 @@ export class AuthService {
 
         return {
             message: "Verification code sent",
+            data: { otp },
         };
     }
 
@@ -108,7 +109,8 @@ export class AuthService {
                 HttpStatus.FORBIDDEN,
                 "This account is Inactive",
             );
-        if (userData.deleted) throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
+        if (userData.deleted)
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
 
         if (!userData?.verified) {
             const { otp, otpExpiry } = generateOTP();
