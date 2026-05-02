@@ -39,7 +39,7 @@ export class AuthController {
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "OTP Sent to your Email",
+            message: result.message,
             data: result.data,
         });
     }
@@ -52,7 +52,7 @@ export class AuthController {
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "User Login successful",
+            message: result.message,
             data: result.data,
         });
     }
@@ -61,11 +61,11 @@ export class AuthController {
     @Post("send-otp")
     @ApiOperation({ summary: "Resend OTP" })
     async resendOTP(@Body() payload: ResendOtpDto) {
-        await this.authService.sendOTP(payload);
+        const result = await this.authService.sendOTP(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "OTP Resent Successfully!",
+            message: result.message,
         });
     }
 
@@ -73,11 +73,11 @@ export class AuthController {
     @Post("verify-otp")
     @ApiOperation({ summary: "Verify OTP" })
     async verifyOTP(@Body() payload: VerifyOtpDto) {
-        await this.authService.verifyOTP(payload);
+        const result = await this.authService.verifyOTP(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "OTP Verification successful",
+            message: result.message,
         });
     }
 
@@ -85,11 +85,11 @@ export class AuthController {
     @Post("send-otp/password-reset")
     @ApiOperation({ summary: "Send Forgot Password OTP" })
     async sendForgotPasswordOtp(@Body() payload: SendForgotPasswordOtpDto) {
-        await this.authService.sendForgotPasswordOtp(payload);
+        const result = await this.authService.sendForgotPasswordOtp(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "Password Reset OTP Sent Successfully!",
+            message: result.message,
         });
     }
 
@@ -101,7 +101,7 @@ export class AuthController {
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "OTP Verification successful",
+            message: result.message,
             data: result.data,
         });
     }
@@ -112,11 +112,14 @@ export class AuthController {
         @Body() payload: ChangePasswordDto,
         @Req() req: Request,
     ) {
-        await this.authService.changePassword(payload, req.user as UserPayload);
+        const result = await this.authService.changePassword(
+            payload,
+            req.user as UserPayload,
+        );
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "Password Changed successfully",
+            message: result.message,
         });
     }
 
@@ -124,11 +127,11 @@ export class AuthController {
     @Post("forgot-password")
     @ApiOperation({ summary: "Forgot Password" })
     async forgotPassword(@Body() payload: ForgotPasswordDto) {
-        await this.authService.forgotPassword(payload);
+        const result = await this.authService.forgotPassword(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "Password Reset Instructions sent to Email",
+            message: result.message,
         });
     }
 
@@ -136,11 +139,11 @@ export class AuthController {
     @Post("reset-password")
     @ApiOperation({ summary: "Reset Password" })
     async resetPassword(@Body() payload: ResetPasswordDto) {
-        await this.authService.resetPassword(payload);
+        const result = await this.authService.resetPassword(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "Password Reset successful",
+            message: result.message,
         });
     }
 
@@ -153,7 +156,7 @@ export class AuthController {
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "Access Token generated",
+            message: result.message,
             data: result.data,
         });
     }

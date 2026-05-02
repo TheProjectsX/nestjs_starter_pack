@@ -29,8 +29,8 @@ export class ProfileController {
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "User data retrieved",
-            data: result,
+            message: result.message,
+            data: result.data,
         });
     }
 
@@ -47,11 +47,11 @@ export class ProfileController {
         }
 
         const user = req.user as UserPayload;
-        await this.profileService.updateProfile(payload, user);
+        const result = await this.profileService.updateProfile(payload, user);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
-            message: "User data updated",
+            message: result.message,
         });
     }
 }
