@@ -11,6 +11,7 @@ import { IS_PUBLIC_KEY } from "@/common/decorators/auth.decorator";
 import config from "@/config";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { UserRole } from "@prisma/client";
+import { ROLES_KEY } from "../decorators/roles.decorator";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -23,6 +24,11 @@ export class AuthGuard implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const isPublic = this.reflector.getAllAndOverride<boolean>(
             IS_PUBLIC_KEY,
+            [context.getHandler(), context.getClass()],
+        );
+
+        const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
+            ROLES_KEY,
             [context.getHandler(), context.getClass()],
         );
 
@@ -65,6 +71,10 @@ export class AuthGuard implements CanActivate {
 
             if (user.status === "INACTIVE") {
                 throw new UnauthorizedException("User is inactive");
+            }
+
+            if (requiredRoles && !requiredRoles.includes(user.role)) {
+                throw new UnauthorizedException("Insufficient permissions");
             }
 
             request["user"] = {
