@@ -202,6 +202,9 @@ export class AuthService {
             where: {
                 email: payload.email,
             },
+            orderBy: {
+                otpExpiry: "desc",
+            },
         });
 
         if (!userData) {
