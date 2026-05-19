@@ -37,6 +37,7 @@ src/modules/
 ```
 
 > **Rule:** A path like `/admin/products/:id` makes `products` a submodule of `admin`. A standalone `/products/:id` is never a submodule. Only create a submodule when there are **more than 1** feature calls — a single call stays inline.
+> Even with submodule, the parent module will have controller even if no direct path is being returned. The parent controller will direct the parent path with `@Controller("module")` and submodules will add the path `@Controller("submodule")`
 
 ---
 
@@ -58,8 +59,8 @@ src/modules/
 (id: string, subFeatureId: string, payload: Dto, user: UserPayload)
 ```
 
-- `user: UserPayload` always comes **last**
-- Omit any parameter that is not needed for the function
+- `user: UserPayload` always comes **last** - Only if `user` is needed
+- Don't take any parameter that is not needed for the function
 
 ---
 
@@ -181,6 +182,7 @@ return { message: "...", data: { id: response.id } };
 - Use `wrapFilename` for single file fields or already-mapped fields
 - Use `walkAndTransform` for nested or array file fields
 - Default file field name is `file` — only use an explicit name when context requires it (e.g. `avatar`)
+- Unless explicitly said to do otherwise, follow these file settings.
 
 ---
 
@@ -244,17 +246,17 @@ throw new ApiError(HttpStatus.<STATUS_CODE>, "Descriptive error message");
 
 ---
 
-### 9. General Rules
+### 9. General Rules [IMPORTANT]
 
 - **No excessive private/helper functions** — only extract when logic is genuinely complex or reused
-- **DTOs are the single source of truth** for payload shape — trust the DTO spread, do not re-validate or re-map fields manually
+- **DTOs are the single source of truth** for payload shape — trust the DTO spread, do not re-validate or re-map fields manually unless needed for data insert
 - **Keep controllers thin** — delegate all business logic to the service
 - **Leverage Prisma** - `include`, `select`, and relational capabilities to avoid manual mapping loops wherever possible
 - **Don't use `any`** - Try not to use `any` in the codebase. If you _need_ to use it, add "eslint-ignore"
 
 ---
 
-### 10. Swagger Documentation
+### 10. DTO Structure
 
 - Annotate all controller routes and DTO fields with Swagger decorators fully
 - For `enum` DTO fields, always pass the enum type and list enum values in the `description`:
@@ -262,5 +264,13 @@ throw new ApiError(HttpStatus.<STATUS_CODE>, "Descriptive error message");
     @ApiProperty({ enum: UserRole, description: `Roles: ${Object.values(UserRole).join(", ")}` })
     role: UserRole;
     ```
+- Use `class-validator` and `class-transformer` to add validations in the DTO fields:
+    ```ts
+    @ApiProperty({ enum: UserRole, description: `Roles: ${Object.values(UserRole).join(", ")}` })
+    @IsEnum(UserRole)
+    role: UserRole;
 
+    @IsString()
+    name: string;
+    ```
 ---
