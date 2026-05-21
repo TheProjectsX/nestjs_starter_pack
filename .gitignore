@@ -40,5 +40,3 @@ dbml
 uploads
 .vercel
 tsconfig.build.tsbuildinfo
-
-API_ROUTES.md
