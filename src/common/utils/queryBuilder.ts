@@ -154,8 +154,7 @@ class QueryBuilder<
         exclude = [],
     }: {
         exacts?: (
-            | EnumKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
-            | (string & {})
+            EnumKeys<Awaited<ReturnType<Model["findMany"]>>[0]> | (string & {})
         )[];
         booleans?: (
             | BooleanKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
@@ -409,8 +408,7 @@ class QueryBuilder<
      */
     rangeDate(
         fields: (
-            | DateKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
-            | (string & {})
+            DateKeys<Awaited<ReturnType<Model["findMany"]>>[0]> | (string & {})
         )[],
     ) {
         const { startDate, endDate } = this.query as {
